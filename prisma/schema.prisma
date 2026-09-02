@@ -1,0 +1,173 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  MEMBER
+}
+
+enum StageType {
+  ENGAGEMENT
+  AWARENESS
+}
+
+enum DealStatus {
+  OPEN
+  WON
+  LOST
+}
+
+enum CampaignContactStatus {
+  QUEUED
+  SENT
+  OPENED
+  REPLIED
+  BOUNCED
+}
+
+enum ActivityType {
+  NOTE
+  EMAIL
+  CALL
+  STAGE_CHANGE
+}
+
+model User {
+  id                 String    @id @default(cuid())
+  email              String    @unique
+  passwordHash       String
+  name               String?
+  role               Role      @default(MEMBER)
+  googleRefreshToken String?
+  googleEmail        String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  createdCampaigns Campaign[] @relation("CampaignCreatedBy")
+  activities       Activity[] @relation("ActivityCreatedBy")
+
+  @@map("users")
+}
+
+model Stage {
+  id    String    @id @default(cuid())
+  name  String
+  order Int
+  type  StageType
+
+  contacts Contact[] @relation("ContactAwarenessStage")
+  deals    Deal[]    @relation("DealEngagementStage")
+
+  @@unique([type, order])
+  @@map("stages")
+}
+
+model Company {
+  id        String   @id @default(cuid())
+  name      String
+  domain    String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  contacts Contact[]
+  deals    Deal[]
+
+  @@map("companies")
+}
+
+model Contact {
+  id               String   @id @default(cuid())
+  name             String
+  email            String
+  title            String?
+  phone            String?
+  notes            String?
+  companyId        String?
+  awarenessStageId String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  company         Company?          @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  awarenessStage  Stage?            @relation("ContactAwarenessStage", fields: [awarenessStageId], references: [id], onDelete: SetNull)
+  deals           Deal[]
+  activities      Activity[]
+  campaignContact CampaignContact[]
+
+  @@index([companyId])
+  @@index([awarenessStageId])
+  @@map("contacts")
+}
+
+model Deal {
+  id                String     @id @default(cuid())
+  title             String
+  value             Decimal?   @db.Decimal(12, 2)
+  status            DealStatus @default(OPEN)
+  contactId         String
+  companyId         String?
+  engagementStageId String
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  contact         Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  company         Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  engagementStage Stage   @relation("DealEngagementStage", fields: [engagementStageId], references: [id])
+
+  @@index([contactId])
+  @@index([engagementStageId])
+  @@map("deals")
+}
+
+model Campaign {
+  id           String   @id @default(cuid())
+  name         String
+  subject      String
+  bodyTemplate String
+  createdById  String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  createdBy User              @relation("CampaignCreatedBy", fields: [createdById], references: [id])
+  contacts  CampaignContact[]
+
+  @@map("campaigns")
+}
+
+model CampaignContact {
+  id         String                 @id @default(cuid())
+  campaignId String
+  contactId  String
+  status     CampaignContactStatus  @default(QUEUED)
+  sentAt     DateTime?
+  openedAt   DateTime?
+  createdAt  DateTime               @default(now())
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contact  Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, contactId])
+  @@index([contactId])
+  @@map("campaign_contacts")
+}
+
+model Activity {
+  id          String       @id @default(cuid())
+  contactId   String
+  type        ActivityType
+  body        String
+  createdById String?
+  createdAt   DateTime     @default(now())
+
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  createdBy User?   @relation("ActivityCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([contactId])
+  @@map("activities")
+}
