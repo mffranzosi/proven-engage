@@ -1,6 +1,10 @@
 import { google } from "googleapis";
 
-const SCOPES = ["https://www.googleapis.com/auth/gmail.send", "https://www.googleapis.com/auth/userinfo.email"];
+const SCOPES = [
+  "https://www.googleapis.com/auth/gmail.send",
+  "https://www.googleapis.com/auth/gmail.readonly",
+  "https://www.googleapis.com/auth/userinfo.email",
+];
 
 function getOAuthClient(redirectUri: string) {
   return new google.auth.OAuth2(
@@ -65,12 +69,50 @@ export async function sendGmail({
 
   const raw = Buffer.from(message).toString("base64url");
 
-  await gmail.users.messages.send({
+  const { data } = await gmail.users.messages.send({
     userId: "me",
     requestBody: { raw },
   });
+
+  return { id: data.id ?? null, threadId: data.threadId ?? null };
 }
 
 export function fillTemplate(template: string, vars: Record<string, string>) {
   return template.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? "");
+}
+
+export async function checkThreadForReply({
+  refreshToken,
+  threadId,
+  ourMessageId,
+}: {
+  refreshToken: string;
+  threadId: string;
+  ourMessageId: string | null;
+}): Promise<{ snippet: string; receivedAt: Date } | null> {
+  const client = getOAuthClient(process.env.APP_URL ? `${process.env.APP_URL}/api/gmail/callback` : "");
+  client.setCredentials({ refresh_token: refreshToken });
+
+  const gmail = google.gmail({ version: "v1", auth: client });
+
+  const { data } = await gmail.users.threads.get({
+    userId: "me",
+    id: threadId,
+    format: "metadata",
+    metadataHeaders: ["Date"],
+  });
+
+  const messages = data.messages ?? [];
+  const ourIndex = ourMessageId ? messages.findIndex((m) => m.id === ourMessageId) : 0;
+  const laterMessages = messages.slice(ourIndex + 1);
+  const reply = laterMessages.find((m) => !(m.labelIds ?? []).includes("SENT"));
+
+  if (!reply) return null;
+
+  const dateHeader = reply.payload?.headers?.find((h) => h.name === "Date")?.value;
+
+  return {
+    snippet: reply.snippet ?? "",
+    receivedAt: dateHeader ? new Date(dateHeader) : new Date(),
+  };
 }

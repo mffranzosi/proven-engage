@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/require-user";
+import { checkAllCampaignReplies } from "@/lib/actions/campaigns";
+
+export const dynamic = "force-dynamic";
 
 export default async function CampaignsPage({
   searchParams,
@@ -14,26 +17,36 @@ export default async function CampaignsPage({
     prisma.user.findUnique({ where: { id: user.id } }),
     prisma.campaign.findMany({
       orderBy: { createdAt: "desc" },
-      include: { _count: { select: { contacts: true } } },
+      include: { contacts: { select: { status: true } } },
     }),
   ]);
 
   const connected = Boolean(dbUser?.googleRefreshToken);
+  const anyCheckable = campaigns.some((c) => c.contacts.some((cc) => cc.status === "SENT" || cc.status === "OPENED"));
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-neutral-900">Campaigns</h1>
-        <Link href="/campaigns/new" className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-800">
-          New campaign
-        </Link>
+        <div className="flex items-center gap-2">
+          {connected && anyCheckable ? (
+            <form action={checkAllCampaignReplies}>
+              <button type="submit" className="rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50">
+                Check for replies
+              </button>
+            </form>
+          ) : null}
+          <Link href="/campaigns/new" className="rounded-md bg-proven-yellow px-3 py-2 text-sm font-semibold text-proven-black hover:bg-proven-yellow-dark">
+            New campaign
+          </Link>
+        </div>
       </div>
 
       {gmail === "connected" ? (
-        <div className="rounded-md bg-green-50 px-4 py-2 text-sm text-green-700">Google account connected.</div>
+        <div className="rounded-md bg-proven-lightblue/10 px-4 py-2 text-sm text-proven-blue">Google account connected.</div>
       ) : null}
       {gmail === "error" || gmail === "no_refresh_token" ? (
-        <div className="rounded-md bg-red-50 px-4 py-2 text-sm text-red-700">
+        <div className="rounded-md bg-proven-coral/10 px-4 py-2 text-sm text-proven-coral">
           Couldn&apos;t connect your Google account. Try again.
         </div>
       ) : null}
@@ -44,7 +57,8 @@ export default async function CampaignsPage({
             Sending as <span className="font-medium text-neutral-900">{dbUser?.googleEmail}</span>.{" "}
             <a href="/api/gmail/connect" className="text-neutral-500 hover:underline">
               Reconnect
-            </a>
+            </a>{" "}
+            <span className="text-neutral-400">(reconnect once to enable reading replies)</span>
           </p>
         ) : (
           <a href="/api/gmail/connect" className="text-sm font-medium text-neutral-900 hover:underline">
@@ -59,24 +73,44 @@ export default async function CampaignsPage({
             <tr>
               <th className="px-4 py-2 font-medium">Name</th>
               <th className="px-4 py-2 font-medium">Subject</th>
-              <th className="px-4 py-2 font-medium">Contacts</th>
+              <th className="px-4 py-2 font-medium">Sent</th>
+              <th className="px-4 py-2 font-medium">Opened</th>
+              <th className="px-4 py-2 font-medium">Replied</th>
+              <th className="px-4 py-2 font-medium">Bounced</th>
+              <th className="px-4 py-2 font-medium">Status</th>
             </tr>
           </thead>
           <tbody>
-            {campaigns.map((c) => (
-              <tr key={c.id} className="border-b border-neutral-100 last:border-0 hover:bg-neutral-50">
-                <td className="px-4 py-2">
-                  <Link href={`/campaigns/${c.id}`} className="font-medium text-neutral-900 hover:underline">
-                    {c.name}
-                  </Link>
-                </td>
-                <td className="px-4 py-2 text-neutral-600">{c.subject}</td>
-                <td className="px-4 py-2 text-neutral-600">{c._count.contacts}</td>
-              </tr>
-            ))}
+            {campaigns.map((c) => {
+              const isDraft = c.contacts.every((cc) => cc.status === "QUEUED");
+              const countOf = (status: string) => c.contacts.filter((cc) => cc.status === status).length;
+              return (
+                <tr key={c.id} className="border-b border-neutral-100 last:border-0 hover:bg-neutral-50">
+                  <td className="px-4 py-2">
+                    <Link href={`/campaigns/${c.id}`} className="font-medium text-neutral-900 hover:underline">
+                      {c.name}
+                    </Link>
+                  </td>
+                  <td className="px-4 py-2 text-neutral-600">{c.subject}</td>
+                  <td className="px-4 py-2 text-neutral-600">{countOf("SENT")}</td>
+                  <td className="px-4 py-2 text-neutral-600">{countOf("OPENED")}</td>
+                  <td className="px-4 py-2 text-neutral-600">{countOf("REPLIED")}</td>
+                  <td className="px-4 py-2 text-neutral-600">{countOf("BOUNCED")}</td>
+                  <td className="px-4 py-2">
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                        isDraft ? "bg-neutral-100 text-neutral-600" : "bg-proven-blue/10 text-proven-blue"
+                      }`}
+                    >
+                      {isDraft ? "Draft" : "Active"}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
             {campaigns.length === 0 ? (
               <tr>
-                <td colSpan={3} className="px-4 py-6 text-center text-neutral-500">
+                <td colSpan={7} className="px-4 py-6 text-center text-neutral-500">
                   No campaigns yet.
                 </td>
               </tr>

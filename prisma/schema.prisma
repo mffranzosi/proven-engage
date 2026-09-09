@@ -12,17 +12,6 @@ enum Role {
   MEMBER
 }
 
-enum StageType {
-  ENGAGEMENT
-  AWARENESS
-}
-
-enum DealStatus {
-  OPEN
-  WON
-  LOST
-}
-
 enum CampaignContactStatus {
   QUEUED
   SENT
@@ -38,6 +27,39 @@ enum ActivityType {
   STAGE_CHANGE
 }
 
+enum EnrollmentStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+}
+
+enum EnrollmentEventType {
+  SENT
+  BRANCH_SELECTED
+}
+
+enum LinkedInImportStatus {
+  TRIAGE
+  DEDUP
+  DONE
+}
+
+enum LinkedInCohort {
+  PERFECT_MATCH
+  NOT_FOR_PROVEN
+  UNCERTAIN
+}
+
+enum LinkedInMatchDecision {
+  CREATE_NEW
+  MERGE_INTO_EXISTING
+  SKIP
+}
+
+// Contacts and Companies live in Notion (source of truth) — see src/lib/notion.ts.
+// Everything below only stores Postgres-native app data (deals, campaigns, activity)
+// and references Notion pages by their page ID as a plain string, not a foreign key.
+
 model User {
   id                 String    @id @default(cuid())
   email              String    @unique
@@ -51,78 +73,11 @@ model User {
 
   createdCampaigns Campaign[] @relation("CampaignCreatedBy")
   activities       Activity[] @relation("ActivityCreatedBy")
+  contactLists     ContactList[] @relation("ContactListCreatedBy")
+  sequences        Sequence[] @relation("SequenceCreatedBy")
+  linkedinImports  LinkedInImport[] @relation("LinkedInImportCreatedBy")
 
   @@map("users")
-}
-
-model Stage {
-  id    String    @id @default(cuid())
-  name  String
-  order Int
-  type  StageType
-
-  contacts Contact[] @relation("ContactAwarenessStage")
-  deals    Deal[]    @relation("DealEngagementStage")
-
-  @@unique([type, order])
-  @@map("stages")
-}
-
-model Company {
-  id        String   @id @default(cuid())
-  name      String
-  domain    String?
-  notes     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  contacts Contact[]
-  deals    Deal[]
-
-  @@map("companies")
-}
-
-model Contact {
-  id               String   @id @default(cuid())
-  name             String
-  email            String
-  title            String?
-  phone            String?
-  notes            String?
-  companyId        String?
-  awarenessStageId String?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  company         Company?          @relation(fields: [companyId], references: [id], onDelete: SetNull)
-  awarenessStage  Stage?            @relation("ContactAwarenessStage", fields: [awarenessStageId], references: [id], onDelete: SetNull)
-  deals           Deal[]
-  activities      Activity[]
-  campaignContact CampaignContact[]
-
-  @@index([companyId])
-  @@index([awarenessStageId])
-  @@map("contacts")
-}
-
-model Deal {
-  id                String     @id @default(cuid())
-  title             String
-  value             Decimal?   @db.Decimal(12, 2)
-  status            DealStatus @default(OPEN)
-  contactId         String
-  companyId         String?
-  engagementStageId String
-  createdAt         DateTime   @default(now())
-  updatedAt         DateTime   @updatedAt
-
-  contact         Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  company         Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
-  engagementStage Stage   @relation("DealEngagementStage", fields: [engagementStageId], references: [id])
-
-  @@index([contactId])
-  @@index([engagementStageId])
-  @@map("deals")
 }
 
 model Campaign {
@@ -141,33 +96,225 @@ model Campaign {
 }
 
 model CampaignContact {
-  id         String                 @id @default(cuid())
-  campaignId String
-  contactId  String
-  status     CampaignContactStatus  @default(QUEUED)
-  sentAt     DateTime?
-  openedAt   DateTime?
-  createdAt  DateTime               @default(now())
+  id                    String                @id @default(cuid())
+  campaignId            String
+  notionContactId       String
+  status                CampaignContactStatus @default(QUEUED)
+  sentAt                DateTime?
+  openedAt              DateTime?
+  gmailThreadId         String?
+  gmailMessageId        String?
+  replySnippet          String?
+  repliedAt             DateTime?
+  repliedAcknowledgedAt DateTime?
+  createdAt             DateTime              @default(now())
 
   campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  contact  Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
 
-  @@unique([campaignId, contactId])
-  @@index([contactId])
+  @@unique([campaignId, notionContactId])
+  @@index([notionContactId])
   @@map("campaign_contacts")
 }
 
 model Activity {
-  id          String       @id @default(cuid())
-  contactId   String
-  type        ActivityType
-  body        String
-  createdById String?
-  createdAt   DateTime     @default(now())
+  id              String       @id @default(cuid())
+  notionContactId String
+  type            ActivityType
+  body            String
+  createdById     String?
+  createdAt       DateTime     @default(now())
 
-  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  createdBy User?   @relation("ActivityCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdBy User? @relation("ActivityCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
 
-  @@index([contactId])
+  @@index([notionContactId])
   @@map("activities")
+}
+
+model ContactList {
+  id          String   @id @default(cuid())
+  name        String
+  createdById String
+  createdAt   DateTime @default(now())
+
+  createdBy User                @relation("ContactListCreatedBy", fields: [createdById], references: [id])
+  members   ContactListMember[]
+
+  @@map("contact_lists")
+}
+
+model ContactListMember {
+  id              String   @id @default(cuid())
+  listId          String
+  notionContactId String
+  addedAt         DateTime @default(now())
+
+  list ContactList @relation(fields: [listId], references: [id], onDelete: Cascade)
+
+  @@unique([listId, notionContactId])
+  @@map("contact_list_members")
+}
+
+model Sequence {
+  id          String   @id @default(cuid())
+  name        String
+  createdById String
+  createdAt   DateTime @default(now())
+
+  createdBy   User                 @relation("SequenceCreatedBy", fields: [createdById], references: [id])
+  steps       SequenceStep[]
+  enrollments SequenceEnrollment[]
+
+  @@map("sequences")
+}
+
+model SequenceStep {
+  id           String  @id @default(cuid())
+  sequenceId   String
+  order        Int
+  subject      String
+  bodyTemplate String
+  delayDays    Int
+  isTerminal   Boolean @default(false)
+
+  sequence         Sequence                 @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+  branchOptions    SequenceBranchOption[]    @relation("BranchFromStep")
+  incomingBranches SequenceBranchOption[]    @relation("BranchToStep")
+  enrollments      SequenceEnrollment[]      @relation("EnrollmentCurrentStep")
+  events           SequenceEnrollmentEvent[]
+
+  @@unique([sequenceId, order])
+  @@map("sequence_steps")
+}
+
+model SequenceBranchOption {
+  id         String @id @default(cuid())
+  fromStepId String
+  label      String
+  nextStepId String
+
+  fromStep SequenceStep              @relation("BranchFromStep", fields: [fromStepId], references: [id], onDelete: Cascade)
+  nextStep SequenceStep              @relation("BranchToStep", fields: [nextStepId], references: [id])
+  events   SequenceEnrollmentEvent[]
+
+  @@index([fromStepId])
+  @@map("sequence_branch_options")
+}
+
+model SequenceEnrollment {
+  id              String           @id @default(cuid())
+  sequenceId      String
+  notionContactId String
+  currentStepId   String
+  status          EnrollmentStatus @default(ACTIVE)
+  nextSendAt      DateTime
+  enrolledAt      DateTime         @default(now())
+  lastReplySnippet String?
+  lastRepliedAt    DateTime?
+
+  sequence    Sequence                  @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+  currentStep SequenceStep              @relation("EnrollmentCurrentStep", fields: [currentStepId], references: [id])
+  events      SequenceEnrollmentEvent[]
+
+  @@unique([sequenceId, notionContactId])
+  @@index([notionContactId])
+  @@index([status, nextSendAt])
+  @@map("sequence_enrollments")
+}
+
+model SequenceEnrollmentEvent {
+  id             String              @id @default(cuid())
+  enrollmentId   String
+  stepId         String
+  type           EnrollmentEventType
+  branchOptionId String?
+  gmailThreadId  String?
+  gmailMessageId String?
+  occurredAt     DateTime            @default(now())
+
+  enrollment   SequenceEnrollment    @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  step         SequenceStep          @relation(fields: [stepId], references: [id])
+  branchOption SequenceBranchOption? @relation(fields: [branchOptionId], references: [id])
+
+  @@index([enrollmentId])
+  @@map("sequence_enrollment_events")
+}
+
+// A single "upload the LinkedIn export" run, moving through triage -> dedup -> done.
+model LinkedInImport {
+  id          String               @id @default(cuid())
+  createdById String
+  status      LinkedInImportStatus @default(TRIAGE)
+  createdAt   DateTime             @default(now())
+
+  createdBy User                @relation("LinkedInImportCreatedBy", fields: [createdById], references: [id])
+  items     LinkedInImportItem[]
+
+  @@map("linkedin_imports")
+}
+
+// One LinkedIn connection within an import, from raw CSV row through to final outcome.
+model LinkedInImportItem {
+  id         String @id @default(cuid())
+  importId   String
+  profileUrl String
+
+  firstName String
+  lastName  String
+  email     String?
+  company   String?
+  position  String?
+  connectedOn DateTime?
+
+  aiCohort LinkedInCohort
+  aiReason String?
+
+  // Set once Marco confirms the triage step for this import.
+  selectedForCrm Boolean?
+
+  // Dedup step, only computed for items that made it past triage.
+  matchedNotionContactId String?
+  matchedContactName     String?
+  matchConfidence        String? // "email" | "name_company" | "none" — how the match was found
+
+  // Draft review state — saved the moment Marco changes it, not just on final submit,
+  // so an interrupted review session doesn't lose his choices. matchDecision is null
+  // until he explicitly picks something (individually or via a deliberate bulk-accept) —
+  // it is NEVER defaulted, so "Apply to CRM" can never touch a row nobody actually reviewed.
+  matchDecision   LinkedInMatchDecision?
+  enrichEmail     Boolean                @default(true)
+  draftSegment    String?
+
+  // Set once this row has actually been written to Notion. Lets "Apply to CRM" be run
+  // more than once on the same import — already-applied rows are skipped, not redone —
+  // and lets still-undecided rows wait safely for a future review session.
+  appliedAt DateTime?
+
+  resultingNotionContactId String?
+
+  createdAt DateTime @default(now())
+
+  import LinkedInImport @relation(fields: [importId], references: [id], onDelete: Cascade)
+
+  @@index([importId])
+  @@map("linkedin_import_items")
+}
+
+// Cross-import memory: every LinkedIn profile ENGAGE has ever shown Marco, and what
+// was decided, keyed by profile URL. Lets repeat weekly uploads stay quiet unless
+// this person's info has actually changed since.
+model LinkedInContactMemory {
+  id         String   @id @default(cuid())
+  profileUrl String   @unique
+
+  lastFirstName String
+  lastLastName  String
+  lastEmail     String?
+  lastCompany   String?
+  lastPosition  String?
+
+  included         Boolean
+  notionContactId  String?
+  updatedAt        DateTime @updatedAt
+
+  @@map("linkedin_contact_memory")
 }

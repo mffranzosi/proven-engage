@@ -2,25 +2,40 @@
 
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #0a0e14;
+
+  /* PROVEN brand palette */
+  --proven-blue: #023e8a;
+  --proven-blue-dark: #012c63;
+  --proven-yellow: #fec000;
+  --proven-yellow-dark: #d9a600;
+  --proven-lightblue: #00b4d8;
+  --proven-coral: #ff6b6b;
+  --proven-black: #0a0e14;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-poppins);
+  --font-heading: var(--font-dm-sans);
   --font-mono: var(--font-geist-mono);
-}
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-proven-blue: var(--proven-blue);
+  --color-proven-blue-dark: var(--proven-blue-dark);
+  --color-proven-yellow: var(--proven-yellow);
+  --color-proven-yellow-dark: var(--proven-yellow-dark);
+  --color-proven-lightblue: var(--proven-lightblue);
+  --color-proven-coral: var(--proven-coral);
+  --color-proven-black: var(--proven-black);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-poppins), Arial, Helvetica, sans-serif;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-dm-sans), Arial, Helvetica, sans-serif;
 }

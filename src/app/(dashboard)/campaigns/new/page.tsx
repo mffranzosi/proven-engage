@@ -1,8 +1,10 @@
-import { prisma } from "@/lib/prisma";
+import { listContacts } from "@/lib/notion";
 import { createCampaign } from "@/lib/actions/campaigns";
 
+export const dynamic = "force-dynamic";
+
 export default async function NewCampaignPage() {
-  const contacts = await prisma.contact.findMany({ orderBy: { name: "asc" }, include: { company: true } });
+  const contacts = (await listContacts()).sort((a, b) => a.name.localeCompare(b.name));
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -29,13 +31,13 @@ export default async function NewCampaignPage() {
             {contacts.map((c) => (
               <label key={c.id} className="flex items-center gap-2 text-sm">
                 <input type="checkbox" name="contactIds" value={c.id} />
-                {c.name} <span className="text-neutral-400">({c.email})</span>
+                {c.name} <span className="text-neutral-400">({c.email ?? "no email"})</span>
               </label>
             ))}
             {contacts.length === 0 ? <p className="text-sm text-neutral-500">No contacts yet.</p> : null}
           </div>
         </div>
-        <button type="submit" className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-800">
+        <button type="submit" className="rounded-md bg-proven-yellow px-3 py-2 text-sm font-semibold text-proven-black hover:bg-proven-yellow-dark">
           Create campaign
         </button>
       </form>

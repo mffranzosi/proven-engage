@@ -1,4 +1,5 @@
 import { createCompany } from "@/lib/actions/companies";
+import { SEGMENT_OPTIONS } from "@/lib/notion";
 
 export default function NewCompanyPage() {
   return (
@@ -10,14 +11,17 @@ export default function NewCompanyPage() {
           <input name="name" required className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm" />
         </div>
         <div>
-          <label className="block text-sm font-medium text-neutral-700">Domain</label>
-          <input name="domain" placeholder="acme.com" className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm" />
+          <label className="block text-sm font-medium text-neutral-700">Segment</label>
+          <div className="mt-1 space-y-1">
+            {SEGMENT_OPTIONS.map((s) => (
+              <label key={s} className="flex items-center gap-2 text-sm">
+                <input type="checkbox" name="segment" value={s} />
+                {s}
+              </label>
+            ))}
+          </div>
         </div>
-        <div>
-          <label className="block text-sm font-medium text-neutral-700">Notes</label>
-          <textarea name="notes" rows={3} className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm" />
-        </div>
-        <button type="submit" className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-800">
+        <button type="submit" className="rounded-md bg-proven-yellow px-3 py-2 text-sm font-semibold text-proven-black hover:bg-proven-yellow-dark">
           Create company
         </button>
       </form>

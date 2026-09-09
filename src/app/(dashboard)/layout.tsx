@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { requireUser } from "@/lib/require-user";
 import { doSignOut } from "@/lib/actions/signout";
 
@@ -6,8 +7,10 @@ const NAV = [
   { href: "/", label: "Dashboard" },
   { href: "/companies", label: "Companies" },
   { href: "/contacts", label: "Contacts" },
-  { href: "/deals", label: "Deals" },
+  { href: "/contacts/pipeline", label: "Pipeline" },
+  { href: "/lists", label: "Lists" },
   { href: "/campaigns", label: "Campaigns" },
+  { href: "/sequences", label: "Sequences" },
   { href: "/settings/team", label: "Team" },
 ];
 
@@ -19,13 +22,16 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <div className="flex">
         <aside className="sticky top-0 flex h-screen w-56 flex-col justify-between border-r border-neutral-200 bg-white p-4">
           <div>
-            <div className="mb-6 px-2 text-lg font-semibold text-neutral-900">PROVEN CRM</div>
+            <Link href="/" className="mb-6 block px-2">
+              <Image src="/proven-logo.png" alt="PROVEN" width={112} height={22} priority className="h-6 w-auto" />
+              <div className="mt-0.5 text-[11px] font-medium tracking-wide text-proven-blue">ENGAGE</div>
+            </Link>
             <nav className="space-y-1">
               {NAV.map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="block rounded-md px-2 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100"
+                  className="block rounded-md px-2 py-1.5 text-sm font-medium text-neutral-700 hover:bg-proven-yellow/15 hover:text-proven-blue"
                 >
                   {item.label}
                 </Link>

@@ -3,25 +3,28 @@
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/require-user";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
+import {
+  createContact as notionCreateContact,
+  updateContact as notionUpdateContact,
+  getContact as notionGetContact,
+  archiveContact,
+} from "@/lib/notion";
 
 export async function createContact(formData: FormData) {
   const user = await requireUser();
 
   const name = String(formData.get("name") || "").trim();
   const email = String(formData.get("email") || "").trim();
-  const title = String(formData.get("title") || "").trim() || null;
-  const phone = String(formData.get("phone") || "").trim() || null;
-  const companyId = String(formData.get("companyId") || "").trim() || null;
-  const awarenessStageId = String(formData.get("awarenessStageId") || "").trim() || null;
+  const phone = String(formData.get("phone") || "").trim() || undefined;
+  const companyId = String(formData.get("companyId") || "").trim() || undefined;
 
-  if (!name || !email) throw new Error("Name and email are required.");
+  if (!name) throw new Error("Name is required.");
 
-  const contact = await prisma.contact.create({
-    data: { name, email, title, phone, companyId, awarenessStageId },
-  });
+  const contact = await notionCreateContact({ name, email: email || undefined, phone, companyId });
 
   await prisma.activity.create({
-    data: { contactId: contact.id, type: "NOTE", body: "Contact created", createdById: user.id },
+    data: { notionContactId: contact.id, type: "NOTE", body: "Contact created", createdById: user.id },
   });
 
   redirect(`/contacts/${contact.id}`);
@@ -32,20 +35,41 @@ export async function updateContact(contactId: string, formData: FormData) {
 
   const name = String(formData.get("name") || "").trim();
   const email = String(formData.get("email") || "").trim();
-  const title = String(formData.get("title") || "").trim() || null;
-  const phone = String(formData.get("phone") || "").trim() || null;
+  const phone = String(formData.get("phone") || "").trim();
   const companyId = String(formData.get("companyId") || "").trim() || null;
-  const awarenessStageId = String(formData.get("awarenessStageId") || "").trim() || null;
-  const notes = String(formData.get("notes") || "").trim() || null;
+  const nextAction = String(formData.get("nextAction") || "").trim();
 
-  if (!name || !email) throw new Error("Name and email are required.");
+  if (!name) throw new Error("Name is required.");
 
-  await prisma.contact.update({
-    where: { id: contactId },
-    data: { name, email, title, phone, companyId, awarenessStageId, notes },
-  });
+  await notionUpdateContact(contactId, { name, email, phone, companyId, nextAction });
 
   redirect(`/contacts/${contactId}`);
+}
+
+export async function moveContactBusinessStatus(contactId: string, businessStatus: string) {
+  const user = await requireUser();
+
+  const before = await notionGetContact(contactId).catch(() => null);
+  await notionUpdateContact(contactId, { businessStatus });
+
+  await prisma.activity.create({
+    data: {
+      notionContactId: contactId,
+      type: "STAGE_CHANGE",
+      body: `Business status moved from "${before?.businessStatus ?? "neutral"}" to "${businessStatus}"`,
+      createdById: user.id,
+    },
+  });
+
+  revalidatePath("/contacts/pipeline");
+  revalidatePath("/contacts");
+  revalidatePath("/");
+}
+
+export async function deleteContact(contactId: string) {
+  await requireUser();
+  await archiveContact(contactId);
+  redirect(`/contacts`);
 }
 
 export async function addContactNote(contactId: string, formData: FormData) {
@@ -54,7 +78,7 @@ export async function addContactNote(contactId: string, formData: FormData) {
   if (!body) return;
 
   await prisma.activity.create({
-    data: { contactId, type: "NOTE", body, createdById: user.id },
+    data: { notionContactId: contactId, type: "NOTE", body, createdById: user.id },
   });
 
   redirect(`/contacts/${contactId}`);

@@ -1,16 +1,21 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
+import { encode as defaultEncode } from "next-auth/jwt";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 
+const ONE_DAY = 24 * 60 * 60;
+const THIRTY_DAYS = 30 * 24 * 60 * 60;
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  session: { strategy: "jwt" },
+  session: { strategy: "jwt", maxAge: THIRTY_DAYS },
   pages: { signIn: "/login" },
   providers: [
     Credentials({
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
+        remember: { label: "Remember me", type: "text" },
       },
       authorize: async (credentials) => {
         const email = credentials?.email as string | undefined;
@@ -28,6 +33,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           email: user.email,
           name: user.name,
           role: user.role,
+          rememberMe: credentials?.remember === "true",
         };
       },
     }),
@@ -37,6 +43,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (user) {
         token.id = user.id as string;
         token.role = (user as { role?: string }).role;
+        token.rememberMe = (user as { rememberMe?: boolean }).rememberMe ?? false;
       }
       return token;
     },
@@ -46,6 +53,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         (session.user as { role?: string }).role = token.role as string;
       }
       return session;
+    },
+  },
+  jwt: {
+    encode: async (params) => {
+      const maxAge = params.token?.rememberMe ? THIRTY_DAYS : ONE_DAY;
+      return defaultEncode({ ...params, maxAge });
     },
   },
 });
