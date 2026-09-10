@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import { signIn } from "@/lib/auth";
-import { requireAdmin } from "@/lib/require-user";
+import { requireAdmin, requireUser } from "@/lib/require-user";
 
 export async function registerFirstAdmin(formData: FormData) {
   const existingCount = await prisma.user.count();
@@ -48,4 +48,30 @@ export async function createTeamMember(formData: FormData) {
   });
 
   redirect("/settings/team");
+}
+
+export async function changePassword(formData: FormData) {
+  const sessionUser = await requireUser();
+
+  const currentPassword = String(formData.get("currentPassword") || "");
+  const newPassword = String(formData.get("newPassword") || "");
+  const confirmPassword = String(formData.get("confirmPassword") || "");
+
+  if (newPassword.length < 8) {
+    throw new Error("New password must be at least 8 characters.");
+  }
+  if (newPassword !== confirmPassword) {
+    throw new Error("New password and confirmation don't match.");
+  }
+
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: sessionUser.id } });
+  const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+  if (!valid) {
+    throw new Error("Current password is incorrect.");
+  }
+
+  const passwordHash = await bcrypt.hash(newPassword, 12);
+  await prisma.user.update({ where: { id: user.id }, data: { passwordHash } });
+
+  redirect("/settings/account?changed=1");
 }

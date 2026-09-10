@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
   const due = await prisma.sequenceEnrollment.findMany({
     where: { status: "ACTIVE", nextSendAt: { lte: new Date() } },
     include: {
-      currentStep: { include: { sequence: { include: { createdBy: true } } } },
+      currentStep: { include: { sequence: { include: { sendAsAccount: true } } } },
     },
   });
 
@@ -30,12 +30,7 @@ export async function GET(req: NextRequest) {
 
   for (const enrollment of due) {
     const step = enrollment.currentStep;
-    const sender = step.sequence.createdBy;
-
-    if (!sender.googleRefreshToken || !sender.googleEmail) {
-      results.push({ enrollmentId: enrollment.id, outcome: "skipped: sender not connected to Gmail" });
-      continue;
-    }
+    const sender = step.sequence.sendAsAccount;
 
     const contact = await getContact(enrollment.notionContactId).catch(() => null);
     if (!contact?.email) {
@@ -50,8 +45,8 @@ export async function GET(req: NextRequest) {
       });
 
       const sent = await sendGmail({
-        refreshToken: sender.googleRefreshToken,
-        from: sender.googleEmail,
+        refreshToken: sender.refreshToken,
+        from: sender.email,
         to: contact.email,
         subject: step.subject,
         html,

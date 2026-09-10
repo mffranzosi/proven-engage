@@ -1,10 +1,31 @@
 import { listContacts } from "@/lib/notion";
 import { createCampaign } from "@/lib/actions/campaigns";
+import { prisma } from "@/lib/prisma";
+import { requireUser } from "@/lib/require-user";
 
 export const dynamic = "force-dynamic";
 
 export default async function NewCampaignPage() {
-  const contacts = (await listContacts()).sort((a, b) => a.name.localeCompare(b.name));
+  const user = await requireUser();
+  const [contactsRaw, accounts] = await Promise.all([
+    listContacts(),
+    prisma.connectedEmailAccount.findMany({ where: { userId: user.id }, orderBy: { createdAt: "asc" } }),
+  ]);
+  const contacts = contactsRaw.sort((a, b) => a.name.localeCompare(b.name));
+
+  if (accounts.length === 0) {
+    return (
+      <div className="max-w-2xl space-y-4">
+        <h1 className="text-2xl font-semibold text-neutral-900">New campaign</h1>
+        <div className="rounded-lg border border-neutral-200 bg-white p-6 text-sm text-neutral-600">
+          Connect a Gmail account before creating a campaign.{" "}
+          <a href="/settings/accounts" className="font-medium text-neutral-900 hover:underline">
+            Connect one now →
+          </a>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -13,6 +34,16 @@ export default async function NewCampaignPage() {
         <div>
           <label className="block text-sm font-medium text-neutral-700">Campaign name</label>
           <input name="name" required className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-neutral-700">Send from</label>
+          <select name="sendAsAccountId" required className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm">
+            {accounts.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.email}
+              </option>
+            ))}
+          </select>
         </div>
         <div>
           <label className="block text-sm font-medium text-neutral-700">Subject</label>

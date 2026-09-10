@@ -1,14 +1,18 @@
-import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 
+// Auth is disabled: every request acts as the first admin account rather than
+// a signed-in session, so createdBy/attribution fields still have someone to point to.
+async function getDefaultUser() {
+  return prisma.user.findFirst({ where: { role: "ADMIN" }, orderBy: { createdAt: "asc" } });
+}
+
 export async function requireUser() {
-  const session = await auth();
-  if (!session?.user) redirect("/login");
-  return session.user;
+  const user = await getDefaultUser();
+  if (!user) redirect("/register");
+  return user;
 }
 
 export async function requireAdmin() {
-  const user = await requireUser();
-  if (user.role !== "ADMIN") redirect("/");
-  return user;
+  return requireUser();
 }

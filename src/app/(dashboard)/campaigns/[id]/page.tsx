@@ -29,6 +29,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
       include: {
         contacts: { orderBy: { createdAt: "asc" } },
         createdBy: true,
+        sendAsAccount: true,
       },
     }),
     listContacts(),
@@ -67,6 +68,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
             {isDraft ? "Draft" : "Active"}
           </span>
         </div>
+        <p className="mt-1 text-xs text-neutral-400">Sending from {campaign.sendAsAccount.email}</p>
       </div>
 
       {isDraft ? (

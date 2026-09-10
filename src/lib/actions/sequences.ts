@@ -9,9 +9,18 @@ import { checkThreadForReply } from "@/lib/gmail";
 export async function createSequence(formData: FormData) {
   const user = await requireUser();
   const name = String(formData.get("name") || "").trim();
+  const sendAsAccountId = String(formData.get("sendAsAccountId") || "").trim();
   if (!name) throw new Error("Sequence name is required.");
+  if (!sendAsAccountId) throw new Error("Choose which connected account to send from.");
 
-  const sequence = await prisma.sequence.create({ data: { name, createdById: user.id } });
+  const account = await prisma.connectedEmailAccount.findFirst({
+    where: { id: sendAsAccountId, userId: user.id },
+  });
+  if (!account) throw new Error("That connected account was not found.");
+
+  const sequence = await prisma.sequence.create({
+    data: { name, createdById: user.id, sendAsAccountId: account.id },
+  });
   redirect(`/sequences/${sequence.id}`);
 }
 
@@ -157,20 +166,17 @@ export async function checkEnrollmentReply(sequenceId: string, enrollmentId: str
   const enrollment = await prisma.sequenceEnrollment.findUnique({
     where: { id: enrollmentId },
     include: {
-      sequence: { include: { createdBy: true } },
+      sequence: { include: { sendAsAccount: true } },
       events: { where: { type: "SENT" }, orderBy: { occurredAt: "desc" }, take: 1 },
     },
   });
   if (!enrollment) throw new Error("Enrollment not found.");
 
-  const sender = enrollment.sequence.createdBy;
-  if (!sender.googleRefreshToken) throw new Error("Connect Google first.");
-
   const lastSent = enrollment.events[0];
   if (!lastSent?.gmailThreadId) return;
 
   const reply = await checkThreadForReply({
-    refreshToken: sender.googleRefreshToken,
+    refreshToken: enrollment.sequence.sendAsAccount.refreshToken,
     threadId: lastSent.gmailThreadId,
     ourMessageId: lastSent.gmailMessageId,
   }).catch(() => null);

@@ -61,38 +61,56 @@ enum LinkedInMatchDecision {
 // and references Notion pages by their page ID as a plain string, not a foreign key.
 
 model User {
-  id                 String    @id @default(cuid())
-  email              String    @unique
-  passwordHash       String
-  name               String?
-  role               Role      @default(MEMBER)
-  googleRefreshToken String?
-  googleEmail        String?
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String?
+  role         Role     @default(MEMBER)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  createdCampaigns Campaign[] @relation("CampaignCreatedBy")
-  activities       Activity[] @relation("ActivityCreatedBy")
-  contactLists     ContactList[] @relation("ContactListCreatedBy")
-  sequences        Sequence[] @relation("SequenceCreatedBy")
-  linkedinImports  LinkedInImport[] @relation("LinkedInImportCreatedBy")
+  createdCampaigns      Campaign[]             @relation("CampaignCreatedBy")
+  activities            Activity[]             @relation("ActivityCreatedBy")
+  contactLists           ContactList[]          @relation("ContactListCreatedBy")
+  sequences              Sequence[]             @relation("SequenceCreatedBy")
+  linkedinImports        LinkedInImport[]       @relation("LinkedInImportCreatedBy")
+  connectedEmailAccounts ConnectedEmailAccount[] @relation("ConnectedEmailAccountOwner")
 
   @@map("users")
 }
 
 model Campaign {
-  id           String   @id @default(cuid())
-  name         String
-  subject      String
-  bodyTemplate String
-  createdById  String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                    String   @id @default(cuid())
+  name                  String
+  subject               String
+  bodyTemplate          String
+  createdById           String
+  sendAsAccountId       String
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
-  createdBy User              @relation("CampaignCreatedBy", fields: [createdById], references: [id])
-  contacts  CampaignContact[]
+  createdBy     User                  @relation("CampaignCreatedBy", fields: [createdById], references: [id])
+  sendAsAccount ConnectedEmailAccount @relation(fields: [sendAsAccountId], references: [id])
+  contacts      CampaignContact[]
 
   @@map("campaigns")
+}
+
+// One connected Gmail inbox belonging to one person. A person can connect several;
+// each Campaign/Sequence picks exactly one to send through and read replies from.
+model ConnectedEmailAccount {
+  id           String   @id @default(cuid())
+  userId       String
+  email        String
+  refreshToken String
+  createdAt    DateTime @default(now())
+
+  user      User       @relation("ConnectedEmailAccountOwner", fields: [userId], references: [id], onDelete: Cascade)
+  campaigns Campaign[]
+  sequences Sequence[]
+
+  @@unique([userId, email])
+  @@map("connected_email_accounts")
 }
 
 model CampaignContact {
@@ -155,14 +173,16 @@ model ContactListMember {
 }
 
 model Sequence {
-  id          String   @id @default(cuid())
-  name        String
-  createdById String
-  createdAt   DateTime @default(now())
+  id              String   @id @default(cuid())
+  name            String
+  createdById     String
+  sendAsAccountId String
+  createdAt       DateTime @default(now())
 
-  createdBy   User                 @relation("SequenceCreatedBy", fields: [createdById], references: [id])
-  steps       SequenceStep[]
-  enrollments SequenceEnrollment[]
+  createdBy     User                  @relation("SequenceCreatedBy", fields: [createdById], references: [id])
+  sendAsAccount ConnectedEmailAccount @relation(fields: [sendAsAccountId], references: [id])
+  steps         SequenceStep[]
+  enrollments   SequenceEnrollment[]
 
   @@map("sequences")
 }

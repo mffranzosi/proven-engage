@@ -1,7 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
 import { requireUser } from "@/lib/require-user";
-import { doSignOut } from "@/lib/actions/signout";
 
 const NAV = [
   { href: "/", label: "Dashboard" },
@@ -11,6 +10,7 @@ const NAV = [
   { href: "/lists", label: "Lists" },
   { href: "/campaigns", label: "Campaigns" },
   { href: "/sequences", label: "Sequences" },
+  { href: "/settings/accounts", label: "Connected accounts" },
   { href: "/settings/team", label: "Team" },
 ];
 
@@ -39,12 +39,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
             </nav>
           </div>
           <div className="space-y-2 border-t border-neutral-200 pt-4">
-            <div className="px-2 text-xs text-neutral-500">{user.email}</div>
-            <form action={doSignOut}>
-              <button type="submit" className="w-full rounded-md px-2 py-1.5 text-left text-sm text-neutral-700 hover:bg-neutral-100">
-                Sign out
-              </button>
-            </form>
+            <p className="px-2 text-xs text-neutral-400">{user.email}</p>
           </div>
         </aside>
         <main className="flex-1 p-8">{children}</main>

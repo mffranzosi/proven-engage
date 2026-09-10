@@ -13,11 +13,20 @@ export async function createCampaign(formData: FormData) {
   const name = String(formData.get("name") || "").trim();
   const subject = String(formData.get("subject") || "").trim();
   const bodyTemplate = String(formData.get("bodyTemplate") || "").trim();
+  const sendAsAccountId = String(formData.get("sendAsAccountId") || "").trim();
   const contactIds = formData.getAll("contactIds").map(String);
 
   if (!name || !subject || !bodyTemplate) {
     throw new Error("Name, subject, and body are required.");
   }
+  if (!sendAsAccountId) {
+    throw new Error("Choose which connected account to send from.");
+  }
+
+  const account = await prisma.connectedEmailAccount.findFirst({
+    where: { id: sendAsAccountId, userId: user.id },
+  });
+  if (!account) throw new Error("That connected account was not found.");
 
   const campaign = await prisma.campaign.create({
     data: {
@@ -25,6 +34,7 @@ export async function createCampaign(formData: FormData) {
       subject,
       bodyTemplate,
       createdById: user.id,
+      sendAsAccountId: account.id,
       contacts: {
         create: contactIds.map((notionContactId) => ({ notionContactId })),
       },
@@ -77,14 +87,9 @@ export async function addContactsToCampaign(campaignId: string, formData: FormDa
 export async function sendCampaign(campaignId: string) {
   const user = await requireUser();
 
-  const dbUser = await prisma.user.findUnique({ where: { id: user.id } });
-  if (!dbUser?.googleRefreshToken || !dbUser.googleEmail) {
-    throw new Error("Connect your Google account before sending.");
-  }
-
   const campaign = await prisma.campaign.findUnique({
     where: { id: campaignId },
-    include: { contacts: { where: { status: "QUEUED" } } },
+    include: { contacts: { where: { status: "QUEUED" } }, sendAsAccount: true },
   });
   if (!campaign) throw new Error("Campaign not found.");
 
@@ -105,8 +110,8 @@ export async function sendCampaign(campaignId: string) {
 
     try {
       const sent = await sendGmail({
-        refreshToken: dbUser.googleRefreshToken,
-        from: dbUser.googleEmail,
+        refreshToken: campaign.sendAsAccount.refreshToken,
+        from: campaign.sendAsAccount.email,
         to: contact.email,
         subject: campaign.subject,
         html,
@@ -190,19 +195,16 @@ async function checkRepliesForContacts(
 export async function checkCampaignReplies(campaignId: string) {
   const user = await requireUser();
 
-  const dbUser = await prisma.user.findUnique({ where: { id: user.id } });
-  if (!dbUser?.googleRefreshToken) throw new Error("Connect your Google account first.");
-
   const campaign = await prisma.campaign.findUnique({
     where: { id: campaignId },
-    include: { contacts: { where: { status: { in: ["SENT", "OPENED"] } } } },
+    include: { contacts: { where: { status: { in: ["SENT", "OPENED"] } } }, sendAsAccount: true },
   });
   if (!campaign) throw new Error("Campaign not found.");
 
   await checkRepliesForContacts(
     campaign.contacts.map((c) => ({ ...c, campaignId })),
     new Map([[campaignId, campaign.subject]]),
-    dbUser.googleRefreshToken,
+    campaign.sendAsAccount.refreshToken,
     user.id,
   );
 
@@ -213,18 +215,21 @@ export async function checkCampaignReplies(campaignId: string) {
 export async function checkAllCampaignReplies() {
   const user = await requireUser();
 
-  const dbUser = await prisma.user.findUnique({ where: { id: user.id } });
-  if (!dbUser?.googleRefreshToken) throw new Error("Connect your Google account first.");
-
   const campaigns = await prisma.campaign.findMany({
     where: { createdById: user.id },
-    include: { contacts: { where: { status: { in: ["SENT", "OPENED"] } } } },
+    include: { contacts: { where: { status: { in: ["SENT", "OPENED"] } } }, sendAsAccount: true },
   });
 
   const campaignSubjectById = new Map(campaigns.map((c) => [c.id, c.subject]));
-  const allContacts = campaigns.flatMap((c) => c.contacts.map((cc) => ({ ...cc, campaignId: c.id })));
 
-  await checkRepliesForContacts(allContacts, campaignSubjectById, dbUser.googleRefreshToken, user.id);
+  for (const campaign of campaigns) {
+    await checkRepliesForContacts(
+      campaign.contacts.map((cc) => ({ ...cc, campaignId: campaign.id })),
+      campaignSubjectById,
+      campaign.sendAsAccount.refreshToken,
+      user.id,
+    );
+  }
 
   revalidatePath("/campaigns");
   revalidatePath("/");

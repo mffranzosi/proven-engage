@@ -13,15 +13,15 @@ export default async function CampaignsPage({
   const user = await requireUser();
   const { gmail } = await searchParams;
 
-  const [dbUser, campaigns] = await Promise.all([
-    prisma.user.findUnique({ where: { id: user.id } }),
+  const [accounts, campaigns] = await Promise.all([
+    prisma.connectedEmailAccount.findMany({ where: { userId: user.id }, orderBy: { createdAt: "asc" } }),
     prisma.campaign.findMany({
       orderBy: { createdAt: "desc" },
-      include: { contacts: { select: { status: true } } },
+      include: { contacts: { select: { status: true } }, sendAsAccount: true },
     }),
   ]);
 
-  const connected = Boolean(dbUser?.googleRefreshToken);
+  const connected = accounts.length > 0;
   const anyCheckable = campaigns.some((c) => c.contacts.some((cc) => cc.status === "SENT" || cc.status === "OPENED"));
 
   return (
@@ -54,15 +54,14 @@ export default async function CampaignsPage({
       <div className="rounded-lg border border-neutral-200 bg-white p-4">
         {connected ? (
           <p className="text-sm text-neutral-600">
-            Sending as <span className="font-medium text-neutral-900">{dbUser?.googleEmail}</span>.{" "}
-            <a href="/api/gmail/connect" className="text-neutral-500 hover:underline">
-              Reconnect
-            </a>{" "}
-            <span className="text-neutral-400">(reconnect once to enable reading replies)</span>
+            Connected accounts: <span className="font-medium text-neutral-900">{accounts.map((a) => a.email).join(", ")}</span>.{" "}
+            <a href="/settings/accounts" className="text-neutral-500 hover:underline">
+              Manage
+            </a>
           </p>
         ) : (
-          <a href="/api/gmail/connect" className="text-sm font-medium text-neutral-900 hover:underline">
-            Connect your Google account to send campaigns →
+          <a href="/settings/accounts" className="text-sm font-medium text-neutral-900 hover:underline">
+            Connect a Google account to send campaigns →
           </a>
         )}
       </div>
@@ -73,6 +72,7 @@ export default async function CampaignsPage({
             <tr>
               <th className="px-4 py-2 font-medium">Name</th>
               <th className="px-4 py-2 font-medium">Subject</th>
+              <th className="px-4 py-2 font-medium">Sending from</th>
               <th className="px-4 py-2 font-medium">Sent</th>
               <th className="px-4 py-2 font-medium">Opened</th>
               <th className="px-4 py-2 font-medium">Replied</th>
@@ -92,6 +92,7 @@ export default async function CampaignsPage({
                     </Link>
                   </td>
                   <td className="px-4 py-2 text-neutral-600">{c.subject}</td>
+                  <td className="px-4 py-2 text-neutral-600">{c.sendAsAccount.email}</td>
                   <td className="px-4 py-2 text-neutral-600">{countOf("SENT")}</td>
                   <td className="px-4 py-2 text-neutral-600">{countOf("OPENED")}</td>
                   <td className="px-4 py-2 text-neutral-600">{countOf("REPLIED")}</td>
@@ -110,7 +111,7 @@ export default async function CampaignsPage({
             })}
             {campaigns.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-6 text-center text-neutral-500">
+                <td colSpan={8} className="px-4 py-6 text-center text-neutral-500">
                   No campaigns yet.
                 </td>
               </tr>
