@@ -27,7 +27,8 @@ export default async function TeamSettingsPage() {
       <div className="rounded-lg border border-neutral-200 bg-white p-6">
         <h2 className="mb-3 text-sm font-semibold text-neutral-900">Add a colleague</h2>
         <p className="mb-4 text-sm text-neutral-500">
-          Set them a temporary password directly — there is no email invite flow yet, so share it with them yourself.
+          No password needed — everyone shares the same team password to get in, then picks their own name from a
+          list. Adding them here just makes their name available to pick.
         </p>
         <form action={createTeamMember} className="space-y-4">
           <div>
@@ -37,10 +38,6 @@ export default async function TeamSettingsPage() {
           <div>
             <label className="block text-sm font-medium text-neutral-700">Email</label>
             <input name="email" type="email" required className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-neutral-700">Temporary password</label>
-            <input name="password" type="text" required minLength={8} className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm" />
           </div>
           <div>
             <label className="block text-sm font-medium text-neutral-700">Role</label>

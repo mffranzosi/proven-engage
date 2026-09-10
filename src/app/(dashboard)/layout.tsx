@@ -39,7 +39,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
             </nav>
           </div>
           <div className="space-y-2 border-t border-neutral-200 pt-4">
-            <p className="px-2 text-xs text-neutral-400">{user.email}</p>
+            <p className="px-2 text-xs text-neutral-400">
+              {user.name || user.email}{" "}
+              <Link href="/whoami" className="text-neutral-500 hover:underline">
+                (switch)
+              </Link>
+            </p>
           </div>
         </aside>
         <main className="flex-1 p-8">{children}</main>
