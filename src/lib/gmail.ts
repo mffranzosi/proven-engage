@@ -45,27 +45,47 @@ export async function sendGmail({
   to,
   subject,
   html,
+  attachments,
 }: {
   refreshToken: string;
   from: string;
   to: string;
   subject: string;
   html: string;
+  attachments?: { filename: string; mimeType: string; data: string }[];
 }) {
   const client = getOAuthClient(process.env.APP_URL ? `${process.env.APP_URL}/api/gmail/callback` : "");
   client.setCredentials({ refresh_token: refreshToken });
 
   const gmail = google.gmail({ version: "v1", auth: client });
 
-  const message = [
-    `From: ${from}`,
-    `To: ${to}`,
-    `Subject: ${encodeSubject(subject)}`,
-    "MIME-Version: 1.0",
-    "Content-Type: text/html; charset=UTF-8",
-    "",
-    html,
-  ].join("\r\n");
+  const headers = [`From: ${from}`, `To: ${to}`, `Subject: ${encodeSubject(subject)}`, "MIME-Version: 1.0"];
+
+  let message: string;
+  if (attachments && attachments.length > 0) {
+    const boundary = `mixed_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const parts = [
+      `--${boundary}`,
+      "Content-Type: text/html; charset=UTF-8",
+      "",
+      html,
+      "",
+      ...attachments.flatMap((att) => [
+        `--${boundary}`,
+        `Content-Type: ${att.mimeType}; name="${att.filename}"`,
+        `Content-Disposition: attachment; filename="${att.filename}"`,
+        "Content-Transfer-Encoding: base64",
+        "",
+        att.data,
+        "",
+      ]),
+      `--${boundary}--`,
+    ];
+
+    message = [...headers, `Content-Type: multipart/mixed; boundary="${boundary}"`, "", ...parts].join("\r\n");
+  } else {
+    message = [...headers, "Content-Type: text/html; charset=UTF-8", "", html].join("\r\n");
+  }
 
   const raw = Buffer.from(message).toString("base64url");
 

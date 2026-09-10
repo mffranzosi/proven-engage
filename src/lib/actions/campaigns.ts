@@ -28,6 +28,21 @@ export async function createCampaign(formData: FormData) {
   });
   if (!account) throw new Error("That connected account was not found.");
 
+  const attachmentFiles = formData.getAll("attachments").filter((f): f is File => f instanceof File && f.size > 0);
+  const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024;
+  for (const file of attachmentFiles) {
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+      throw new Error(`"${file.name}" is too large — attachments must be under 20MB.`);
+    }
+  }
+  const attachments = await Promise.all(
+    attachmentFiles.map(async (file) => ({
+      filename: file.name,
+      mimeType: file.type || "application/octet-stream",
+      data: Buffer.from(await file.arrayBuffer()).toString("base64"),
+    })),
+  );
+
   const campaign = await prisma.campaign.create({
     data: {
       name,
@@ -37,6 +52,9 @@ export async function createCampaign(formData: FormData) {
       sendAsAccountId: account.id,
       contacts: {
         create: contactIds.map((notionContactId) => ({ notionContactId })),
+      },
+      attachments: {
+        create: attachments,
       },
     },
   });
@@ -72,6 +90,32 @@ export async function updateCampaign(campaignId: string, formData: FormData) {
   redirect(`/campaigns/${campaignId}`);
 }
 
+export async function updateCampaignSendAs(campaignId: string, formData: FormData) {
+  const user = await requireUser();
+
+  const sendAsAccountId = String(formData.get("sendAsAccountId") || "").trim();
+  if (!sendAsAccountId) throw new Error("Choose which connected account to send from.");
+
+  const account = await prisma.connectedEmailAccount.findFirst({
+    where: { id: sendAsAccountId, userId: user.id },
+  });
+  if (!account) throw new Error("That connected account was not found.");
+
+  await prisma.campaign.update({
+    where: { id: campaignId },
+    data: { sendAsAccountId: account.id },
+  });
+
+  revalidatePath(`/campaigns/${campaignId}`);
+}
+
+export async function deleteCampaign(campaignId: string) {
+  await requireUser();
+  await prisma.campaign.delete({ where: { id: campaignId } });
+  revalidatePath("/campaigns");
+  redirect("/campaigns");
+}
+
 export async function addContactsToCampaign(campaignId: string, formData: FormData) {
   await requireUser();
   const contactIds = formData.getAll("contactIds").map(String);
@@ -89,11 +133,12 @@ export async function sendCampaign(campaignId: string) {
 
   const campaign = await prisma.campaign.findUnique({
     where: { id: campaignId },
-    include: { contacts: { where: { status: "QUEUED" } }, sendAsAccount: true },
+    include: { contacts: { where: { status: "QUEUED" } }, sendAsAccount: true, attachments: true },
   });
   if (!campaign) throw new Error("Campaign not found.");
 
   const appUrl = process.env.APP_URL ?? "";
+  const attachments = campaign.attachments.map((a) => ({ filename: a.filename, mimeType: a.mimeType, data: a.data }));
 
   for (const cc of campaign.contacts) {
     const contact = await getContact(cc.notionContactId).catch(() => null);
@@ -106,7 +151,9 @@ export async function sendCampaign(campaignId: string) {
       fillTemplate(campaign.bodyTemplate, {
         firstName: contact.name.split(" ")[0] ?? contact.name,
         fullName: contact.name,
-      }) + (appUrl ? `<img src="${appUrl}/api/track/open/${cc.id}" width="1" height="1" alt="" />` : "");
+      }) +
+      (campaign.sendAsAccount.signatureHtml ? `<br />${campaign.sendAsAccount.signatureHtml}` : "") +
+      (appUrl ? `<img src="${appUrl}/api/track/open/${cc.id}" width="1" height="1" alt="" />` : "");
 
     try {
       const sent = await sendGmail({
@@ -115,6 +162,7 @@ export async function sendCampaign(campaignId: string) {
         to: contact.email,
         subject: campaign.subject,
         html,
+        attachments,
       });
 
       await prisma.$transaction([

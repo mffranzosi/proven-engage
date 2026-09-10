@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/require-user";
-import { checkAllCampaignReplies } from "@/lib/actions/campaigns";
+import { checkAllCampaignReplies, deleteCampaign } from "@/lib/actions/campaigns";
+import { DeleteCampaignButton } from "@/components/delete-campaign-button";
 
 export const dynamic = "force-dynamic";
 
@@ -78,12 +79,14 @@ export default async function CampaignsPage({
               <th className="px-4 py-2 font-medium">Replied</th>
               <th className="px-4 py-2 font-medium">Bounced</th>
               <th className="px-4 py-2 font-medium">Status</th>
+              <th className="px-4 py-2 font-medium"></th>
             </tr>
           </thead>
           <tbody>
             {campaigns.map((c) => {
               const isDraft = c.contacts.every((cc) => cc.status === "QUEUED");
               const countOf = (status: string) => c.contacts.filter((cc) => cc.status === status).length;
+              const deleteCampaignWithId = deleteCampaign.bind(null, c.id);
               return (
                 <tr key={c.id} className="border-b border-neutral-100 last:border-0 hover:bg-neutral-50">
                   <td className="px-4 py-2">
@@ -106,12 +109,19 @@ export default async function CampaignsPage({
                       {isDraft ? "Draft" : "Active"}
                     </span>
                   </td>
+                  <td className="px-4 py-2 text-right">
+                    <DeleteCampaignButton
+                      action={deleteCampaignWithId}
+                      campaignName={c.name}
+                      className="text-xs text-neutral-400 hover:text-proven-coral hover:underline"
+                    />
+                  </td>
                 </tr>
               );
             })}
             {campaigns.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-6 text-center text-neutral-500">
+                <td colSpan={9} className="px-4 py-6 text-center text-neutral-500">
                   No campaigns yet.
                 </td>
               </tr>

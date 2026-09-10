@@ -39,10 +39,11 @@ export async function GET(req: NextRequest) {
     }
 
     try {
-      const html = fillTemplate(step.bodyTemplate, {
-        firstName: contact.name.split(" ")[0] ?? contact.name,
-        fullName: contact.name,
-      });
+      const html =
+        fillTemplate(step.bodyTemplate, {
+          firstName: contact.name.split(" ")[0] ?? contact.name,
+          fullName: contact.name,
+        }) + (sender.signatureHtml ? `<br />${sender.signatureHtml}` : "");
 
       const sent = await sendGmail({
         refreshToken: sender.refreshToken,

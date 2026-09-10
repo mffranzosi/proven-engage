@@ -92,18 +92,37 @@ model Campaign {
   createdBy     User                  @relation("CampaignCreatedBy", fields: [createdById], references: [id])
   sendAsAccount ConnectedEmailAccount @relation(fields: [sendAsAccountId], references: [id])
   contacts      CampaignContact[]
+  attachments   CampaignAttachment[]
 
   @@map("campaigns")
+}
+
+// A small file (logo, one-pager, resume) attached to every email a campaign sends.
+// Stored inline as base64 rather than in blob storage — campaign attachments are
+// small, and this avoids standing up a separate storage integration.
+model CampaignAttachment {
+  id         String   @id @default(cuid())
+  campaignId String
+  filename   String
+  mimeType   String
+  data       String
+  createdAt  DateTime @default(now())
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId])
+  @@map("campaign_attachments")
 }
 
 // One connected Gmail inbox belonging to one person. A person can connect several;
 // each Campaign/Sequence picks exactly one to send through and read replies from.
 model ConnectedEmailAccount {
-  id           String   @id @default(cuid())
-  userId       String
-  email        String
-  refreshToken String
-  createdAt    DateTime @default(now())
+  id            String   @id @default(cuid())
+  userId        String
+  email         String
+  refreshToken  String
+  signatureHtml String?
+  createdAt     DateTime @default(now())
 
   user      User       @relation("ConnectedEmailAccountOwner", fields: [userId], references: [id], onDelete: Cascade)
   campaigns Campaign[]

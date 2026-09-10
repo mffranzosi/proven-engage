@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/require-user";
-import { disconnectAccount } from "@/lib/actions/accounts";
+import { DisconnectAccountButton } from "@/components/disconnect-account-button";
+import { SignatureEditor } from "@/components/signature-editor";
 
 export const dynamic = "force-dynamic";
 
@@ -39,19 +40,18 @@ export default async function ConnectedAccountsPage({
           <p className="p-6 text-sm text-neutral-500">No accounts connected yet.</p>
         ) : (
           <ul className="divide-y divide-neutral-100">
-            {accounts.map((a) => {
-              const disconnectWithId = disconnectAccount.bind(null, a.id);
-              return (
-                <li key={a.id} className="flex items-center justify-between px-6 py-3">
+            {accounts.map((a) => (
+              <li key={a.id} className="space-y-3 px-6 py-4">
+                <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-neutral-900">{a.email}</span>
-                  <form action={disconnectWithId}>
-                    <button type="submit" className="text-xs text-neutral-500 hover:underline">
-                      Disconnect
-                    </button>
-                  </form>
-                </li>
-              );
-            })}
+                  <DisconnectAccountButton accountId={a.id} />
+                </div>
+                <div>
+                  <p className="mb-1 text-xs font-medium text-neutral-500">Signature</p>
+                  <SignatureEditor accountId={a.id} initialHtml={a.signatureHtml} />
+                </div>
+              </li>
+            ))}
           </ul>
         )}
         <div className="border-t border-neutral-100 p-4">
