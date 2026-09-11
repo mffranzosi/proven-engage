@@ -86,7 +86,7 @@ function mapContact(page: NotionPage): NotionContact {
   const p = page.properties;
   return {
     id: page.id,
-    name: plainText(p["Name"]) || plainText(p["Company (legacy text)"]) || "(no name)",
+    name: plainText(p["Name"]) || "(no name)",
     email: emailValue(p["email"]),
     phone: phoneValue(p["Phone"]),
     nextAction: plainText(p["Next action"]) || null,
@@ -126,8 +126,7 @@ export async function createContact(data: {
   connectedOn?: string;
 }): Promise<NotionContact> {
   const properties: Record<string, unknown> = {
-    "Company (legacy text)": { title: [{ text: { content: data.name } }] },
-    Name: { rich_text: [{ text: { content: data.name } }] },
+    Name: { title: [{ text: { content: data.name } }] },
   };
   if (data.email) properties["email"] = { email: data.email };
   if (data.phone) properties["Phone"] = { phone_number: data.phone };
@@ -163,7 +162,7 @@ export async function updateContact(
   },
 ): Promise<NotionContact> {
   const properties: Record<string, unknown> = {};
-  if (data.name !== undefined) properties["Name"] = { rich_text: [{ text: { content: data.name } }] };
+  if (data.name !== undefined) properties["Name"] = { title: [{ text: { content: data.name } }] };
   if (data.email !== undefined) properties["email"] = { email: data.email || null };
   if (data.phone !== undefined) properties["Phone"] = { phone_number: data.phone || null };
   if (data.nextAction !== undefined) properties["Next action"] = { rich_text: [{ text: { content: data.nextAction } }] };
