@@ -62,6 +62,12 @@ export function ContactPicker({
         {filtered.map((c) => (
           <label key={c.id} className="flex items-center gap-2 text-sm">
             <input type="checkbox" name="contactIds" value={c.id} />
+            <span
+              title={c.email ? "Email known" : "No email known"}
+              className={c.email ? "font-semibold text-green-600" : "font-semibold text-red-500"}
+            >
+              {c.email ? "✓" : "✗"}
+            </span>
             {c.name}{" "}
             <span className="text-neutral-400">
               ({c.companyId ? companyById.get(c.companyId)?.name ?? "" : "no company"})
