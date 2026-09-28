@@ -2,8 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { listContacts, listCompanies } from "@/lib/notion";
-import { addContactsToList, removeContactFromList } from "@/lib/actions/lists";
+import { addContactsToList, removeMembersFromList } from "@/lib/actions/lists";
 import { ContactPicker } from "@/components/contact-picker";
+import { ListMembers } from "@/components/list-members";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,7 @@ export default async function ListDetailPage({ params }: { params: Promise<{ id:
     .sort((a, b) => a.name.localeCompare(b.name));
 
   const addContactsWithId = addContactsToList.bind(null, list.id);
+  const removeMembersWithId = removeMembersFromList.bind(null, list.id);
 
   return (
     <div className="max-w-2xl space-y-8">
@@ -40,24 +42,14 @@ export default async function ListDetailPage({ params }: { params: Promise<{ id:
         {list.members.length === 0 ? (
           <p className="text-sm text-neutral-500">No contacts in this list yet.</p>
         ) : (
-          <ul className="divide-y divide-neutral-100">
-            {list.members.map((m) => {
-              const removeMember = removeContactFromList.bind(null, list.id, m.id);
-              const contact = contactById.get(m.notionContactId);
-              return (
-                <li key={m.id} className="flex items-center justify-between py-2 text-sm">
-                  <Link href={`/contacts/${m.notionContactId}`} className="font-medium text-neutral-900 hover:underline">
-                    {contact?.name ?? "(unknown contact)"}
-                  </Link>
-                  <form action={removeMember}>
-                    <button type="submit" className="text-xs text-neutral-500 hover:underline">
-                      Remove
-                    </button>
-                  </form>
-                </li>
-              );
-            })}
-          </ul>
+          <ListMembers
+            members={list.members.map((m) => ({
+              id: m.id,
+              contactId: m.notionContactId,
+              name: contactById.get(m.notionContactId)?.name ?? "(unknown contact)",
+            }))}
+            formAction={removeMembersWithId}
+          />
         )}
       </div>
 

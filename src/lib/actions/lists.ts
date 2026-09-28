@@ -26,6 +26,15 @@ export async function addContactsToList(listId: string, formData: FormData) {
   revalidatePath(`/lists/${listId}`);
 }
 
+export async function removeMembersFromList(listId: string, formData: FormData) {
+  await requireUser();
+  const memberIds = formData.getAll("memberIds").map(String);
+  if (memberIds.length === 0) return;
+
+  await prisma.contactListMember.deleteMany({ where: { listId, id: { in: memberIds } } });
+  revalidatePath(`/lists/${listId}`);
+}
+
 export async function removeContactFromList(listId: string, memberId: string) {
   await requireUser();
   await prisma.contactListMember.delete({ where: { id: memberId } });
