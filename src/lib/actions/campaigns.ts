@@ -29,11 +29,9 @@ export async function createCampaign(formData: FormData) {
   if (!account) throw new Error("That connected account was not found.");
 
   const attachmentFiles = formData.getAll("attachments").filter((f): f is File => f instanceof File && f.size > 0);
-  const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024;
-  for (const file of attachmentFiles) {
-    if (file.size > MAX_ATTACHMENT_BYTES) {
-      throw new Error(`"${file.name}" is too large — attachments must be under 20MB.`);
-    }
+  const MAX_ATTACHMENT_BYTES = 3.5 * 1024 * 1024;
+  if (attachmentFiles.reduce((sum, f) => sum + f.size, 0) > MAX_ATTACHMENT_BYTES) {
+    throw new Error("Attachments are too large: keep the total under 3.5MB.");
   }
   const attachments = await Promise.all(
     attachmentFiles.map(async (file) => ({

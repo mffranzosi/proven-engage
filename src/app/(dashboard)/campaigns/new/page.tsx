@@ -74,7 +74,7 @@ export default async function NewCampaignPage() {
             multiple
             className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-neutral-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-neutral-700 hover:file:bg-neutral-200"
           />
-          <p className="mt-1 text-xs text-neutral-400">Up to 20MB per file.</p>
+          <p className="mt-1 text-xs text-neutral-400">Up to 3.5MB in total.</p>
         </div>
         <div>
           <label className="block text-sm font-medium text-neutral-700">Contacts</label>
