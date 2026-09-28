@@ -97,6 +97,23 @@ export async function sendGmail({
   return { id: data.id ?? null, threadId: data.threadId ?? null };
 }
 
+export type AccountHealth = { ok: true } | { ok: false; reason: "reconnect" | "api_disabled" | "unknown" };
+
+export async function checkAccountHealth(refreshToken: string): Promise<AccountHealth> {
+  const client = getOAuthClient("");
+  client.setCredentials({ refresh_token: refreshToken });
+  try {
+    await google.gmail({ version: "v1", auth: client }).users.getProfile({ userId: "me" });
+    return { ok: true };
+  } catch (e) {
+    const err = e as { response?: { data?: { error?: unknown } }; message?: string };
+    const text = JSON.stringify(err.response?.data?.error ?? err.message ?? "");
+    if (text.includes("invalid_grant")) return { ok: false, reason: "reconnect" };
+    if (text.includes("SERVICE_DISABLED") || text.includes("accessNotConfigured")) return { ok: false, reason: "api_disabled" };
+    return { ok: false, reason: "unknown" };
+  }
+}
+
 export function fillTemplate(template: string, vars: Record<string, string>) {
   return template.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? "");
 }

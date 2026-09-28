@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/require-user";
 import { DisconnectAccountButton } from "@/components/disconnect-account-button";
 import { SignatureEditor } from "@/components/signature-editor";
+import { checkAccountHealth } from "@/lib/gmail";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,8 @@ export default async function ConnectedAccountsPage({
     where: { userId: user.id },
     orderBy: { createdAt: "asc" },
   });
+  const healthList = await Promise.all(accounts.map((a) => checkAccountHealth(a.refreshToken)));
+  const healthById = new Map(accounts.map((a, i) => [a.id, healthList[i]]));
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -43,7 +46,24 @@ export default async function ConnectedAccountsPage({
             {accounts.map((a) => (
               <li key={a.id} className="space-y-3 px-6 py-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-neutral-900">{a.email}</span>
+                  <span className="text-sm font-medium text-neutral-900">
+                    {a.email}{" "}
+                    {(() => {
+                      const h = healthById.get(a.id);
+                      if (h?.ok) return <span className="ml-2 rounded bg-green-50 px-1.5 py-0.5 text-[11px] font-normal text-green-700">Working</span>;
+                      const label =
+                        h?.ok === false && h.reason === "api_disabled"
+                          ? "Gmail API is off in Google Cloud"
+                          : h?.ok === false && h.reason === "unknown"
+                            ? "Can't verify"
+                            : "Needs reconnect";
+                      return (
+                        <span className="ml-2 rounded bg-proven-coral/10 px-1.5 py-0.5 text-[11px] font-normal text-proven-coral">
+                          {label}
+                        </span>
+                      );
+                    })()}
+                  </span>
                   <DisconnectAccountButton accountId={a.id} />
                 </div>
                 <div>
