@@ -10,9 +10,11 @@ type SortDir = "asc" | "desc";
 export function ContactsTable({
   contacts,
   companies,
+  statusOptions,
 }: {
   contacts: NotionContact[];
   companies: NotionCompany[];
+  statusOptions: string[];
 }) {
   const companyById = useMemo(() => new Map(companies.map((c) => [c.id, c])), [companies]);
 
@@ -50,15 +52,24 @@ export function ContactsTable({
     }
   }
 
+  const segmentOptions = useMemo(() => [...new Set(companies.flatMap((c) => c.segment))].sort(), [companies]);
+
+  function segmentMatches(c: NotionContact): boolean {
+    if (!filters.segment) return true;
+    const segments = (c.companyId && companyById.get(c.companyId)?.segment) || [];
+    if (filters.segment === "__none__") return segments.length === 0;
+    return segments.includes(filters.segment);
+  }
+
   const rows = useMemo(() => {
     const filtered = contacts.filter(
       (c) =>
         fieldValue(c, "name").toLowerCase().includes(filters.name.toLowerCase()) &&
         fieldValue(c, "company").toLowerCase().includes(filters.company.toLowerCase()) &&
-        fieldValue(c, "segment").toLowerCase().includes(filters.segment.toLowerCase()) &&
+        segmentMatches(c) &&
         fieldValue(c, "email").toLowerCase().includes(filters.email.toLowerCase()) &&
         fieldValue(c, "phone").toLowerCase().includes(filters.phone.toLowerCase()) &&
-        fieldValue(c, "businessStatus").toLowerCase().includes(filters.businessStatus.toLowerCase()),
+        (!filters.businessStatus || (c.businessStatus ?? "") === filters.businessStatus),
     );
     const sorted = [...filtered].sort((a, b) => {
       const cmp = fieldValue(a, sortKey).localeCompare(fieldValue(b, sortKey));
@@ -98,12 +109,28 @@ export function ContactsTable({
           <tr>
             {columns.map((col) => (
               <th key={col.key} className="px-4 pb-2 font-normal">
-                <input
-                  value={filters[col.key]}
-                  onChange={(e) => setFilter(col.key, e.target.value)}
-                  placeholder="Filter…"
-                  className="w-full rounded-md border border-neutral-200 px-2 py-1 text-xs"
-                />
+                {col.key === "segment" || col.key === "businessStatus" ? (
+                  <select
+                    value={filters[col.key]}
+                    onChange={(e) => setFilter(col.key, e.target.value)}
+                    className="w-full rounded-md border border-neutral-200 px-2 py-1 text-xs"
+                  >
+                    <option value="">All</option>
+                    {col.key === "segment" ? <option value="__none__">(no segment)</option> : null}
+                    {(col.key === "segment" ? segmentOptions : statusOptions).map((o) => (
+                      <option key={o} value={o}>
+                        {o}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    value={filters[col.key]}
+                    onChange={(e) => setFilter(col.key, e.target.value)}
+                    placeholder="Filter…"
+                    className="w-full rounded-md border border-neutral-200 px-2 py-1 text-xs"
+                  />
+                )}
               </th>
             ))}
           </tr>

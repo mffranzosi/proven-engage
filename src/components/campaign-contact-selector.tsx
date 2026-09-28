@@ -28,8 +28,8 @@ export function CampaignContactSelector({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [segment, setSegment] = useState("");
   const [search, setSearch] = useState("");
-  const [hideContacted, setHideContacted] = useState(false);
-  const [hideNoEmail, setHideNoEmail] = useState(true);
+  const [emailKnown, setEmailKnown] = useState<"any" | "yes" | "no">("yes");
+  const [contacted, setContacted] = useState<"any" | "yes" | "no">("any");
 
   const hasBeenSent = (id: string) => (history[id] ?? []).some((h) => h.sent);
 
@@ -38,13 +38,15 @@ export function CampaignContactSelector({
     return contacts.filter((c) => {
       const company = c.companyId ? companyById.get(c.companyId) : undefined;
       if (segment && !(company?.segment ?? []).includes(segment)) return false;
-      if (hideNoEmail && !c.email) return false;
-      if (hideContacted && hasBeenSent(c.id)) return false;
+      if (emailKnown === "yes" && !c.email) return false;
+      if (emailKnown === "no" && c.email) return false;
+      if (contacted === "yes" && !hasBeenSent(c.id)) return false;
+      if (contacted === "no" && hasBeenSent(c.id)) return false;
       if (q && !`${c.name} ${company?.name ?? ""}`.toLowerCase().includes(q)) return false;
       return true;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contacts, companyById, segment, search, hideContacted, hideNoEmail, history]);
+  }, [contacts, companyById, segment, search, contacted, emailKnown, history]);
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -127,12 +129,28 @@ export function CampaignContactSelector({
 
       <div className="flex flex-wrap items-center gap-4 text-xs text-neutral-600">
         <label className="flex items-center gap-1.5">
-          <input type="checkbox" checked={hideNoEmail} onChange={(e) => setHideNoEmail(e.target.checked)} />
-          Hide contacts without an email
+          Email known?
+          <select
+            value={emailKnown}
+            onChange={(e) => setEmailKnown(e.target.value as "any" | "yes" | "no")}
+            className="rounded-md border border-neutral-300 px-2 py-1 text-xs"
+          >
+            <option value="any">Any</option>
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </select>
         </label>
         <label className="flex items-center gap-1.5">
-          <input type="checkbox" checked={hideContacted} onChange={(e) => setHideContacted(e.target.checked)} />
-          Hide already emailed
+          Already contacted in past campaigns?
+          <select
+            value={contacted}
+            onChange={(e) => setContacted(e.target.value as "any" | "yes" | "no")}
+            className="rounded-md border border-neutral-300 px-2 py-1 text-xs"
+          >
+            <option value="any">Any</option>
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </select>
         </label>
         <button type="button" onClick={selectAllShown} className="font-medium text-neutral-900 hover:underline">
           Select all {shown.length} shown

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { listContacts, listCompanies } from "@/lib/notion";
+import { listContacts, listCompanies, BUSINESS_STATUS_VALUES } from "@/lib/notion";
 import { ContactsTable } from "@/components/contacts-table";
 
 export const dynamic = "force-dynamic";
@@ -24,7 +24,7 @@ export default async function ContactsPage() {
         </div>
       </div>
 
-      <ContactsTable contacts={contacts} companies={companies} />
+      <ContactsTable contacts={contacts} companies={companies} statusOptions={[...BUSINESS_STATUS_VALUES]} />
     </div>
   );
 }
