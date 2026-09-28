@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { NotionContact, NotionCompany } from "@/lib/notion";
 
-type SortKey = "name" | "company" | "email" | "phone" | "businessStatus";
+type SortKey = "name" | "company" | "segment" | "email" | "phone" | "businessStatus";
 type SortDir = "asc" | "desc";
 
 export function ContactsTable({
@@ -16,7 +16,7 @@ export function ContactsTable({
 }) {
   const companyById = useMemo(() => new Map(companies.map((c) => [c.id, c])), [companies]);
 
-  const [filters, setFilters] = useState({ name: "", company: "", email: "", phone: "", businessStatus: "" });
+  const [filters, setFilters] = useState({ name: "", company: "", segment: "", email: "", phone: "", businessStatus: "" });
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
 
@@ -39,6 +39,8 @@ export function ContactsTable({
         return c.name;
       case "company":
         return (c.companyId && companyById.get(c.companyId)?.name) || "";
+      case "segment":
+        return (c.companyId && companyById.get(c.companyId)?.segment.join(", ")) || "";
       case "email":
         return c.email ?? "";
       case "phone":
@@ -53,6 +55,7 @@ export function ContactsTable({
       (c) =>
         fieldValue(c, "name").toLowerCase().includes(filters.name.toLowerCase()) &&
         fieldValue(c, "company").toLowerCase().includes(filters.company.toLowerCase()) &&
+        fieldValue(c, "segment").toLowerCase().includes(filters.segment.toLowerCase()) &&
         fieldValue(c, "email").toLowerCase().includes(filters.email.toLowerCase()) &&
         fieldValue(c, "phone").toLowerCase().includes(filters.phone.toLowerCase()) &&
         fieldValue(c, "businessStatus").toLowerCase().includes(filters.businessStatus.toLowerCase()),
@@ -68,6 +71,7 @@ export function ContactsTable({
   const columns: { key: SortKey; label: string }[] = [
     { key: "name", label: "Name" },
     { key: "company", label: "Company" },
+    { key: "segment", label: "Segment" },
     { key: "email", label: "Email" },
     { key: "phone", label: "Phone" },
     { key: "businessStatus", label: "Business status" },
@@ -123,6 +127,7 @@ export function ContactsTable({
                     "—"
                   )}
                 </td>
+                <td className="px-4 py-2 text-neutral-600">{company?.segment.join(", ") || "—"}</td>
                 <td className="px-4 py-2 text-neutral-600">{c.email ?? "—"}</td>
                 <td className="px-4 py-2 text-neutral-600">{c.phone ?? "—"}</td>
                 <td className="px-4 py-2 text-neutral-600">{c.businessStatus ?? "—"}</td>
