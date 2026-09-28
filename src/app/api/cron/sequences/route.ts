@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getContact } from "@/lib/notion";
-import { sendGmail, fillTemplate } from "@/lib/gmail";
+import { sendGmail, fillTemplate, bodyToHtml } from "@/lib/gmail";
 
 function isAuthorized(req: NextRequest): boolean {
   const secret = process.env.CRON_SECRET;
@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
 
     try {
       const html =
-        fillTemplate(step.bodyTemplate, {
+        fillTemplate(bodyToHtml(step.bodyTemplate), {
           firstName: contact.name.split(" ")[0] ?? contact.name,
           fullName: contact.name,
         }) + (sender.signatureHtml ? `<br />${sender.signatureHtml}` : "");

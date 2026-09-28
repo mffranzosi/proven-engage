@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/require-user";
 import { checkAllCampaignReplies, deleteCampaign } from "@/lib/actions/campaigns";
 import { DeleteCampaignButton } from "@/components/delete-campaign-button";
+import { RefreshButton } from "@/components/refresh-button";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,7 @@ export default async function CampaignsPage({
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-neutral-900">Campaigns</h1>
         <div className="flex items-center gap-2">
+          <RefreshButton />
           {connected && anyCheckable ? (
             <form action={checkAllCampaignReplies}>
               <button type="submit" className="rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50">

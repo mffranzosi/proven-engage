@@ -1,3 +1,5 @@
+export type TestSendResult = { ok: boolean; message: string } | null;
+
 export type SendResult = {
   sent: number;
   noEmail: number;

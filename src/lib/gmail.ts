@@ -114,6 +114,13 @@ export async function checkAccountHealth(refreshToken: string): Promise<AccountH
   }
 }
 
+// Typed line breaks become real ones, unless the body already uses HTML layout tags.
+export function bodyToHtml(template: string) {
+  const normalised = template.replace(/\r\n/g, "\n");
+  if (/<\s*(p|br|div|table|ul|ol|li|h[1-6])[\s>/]/i.test(normalised)) return normalised;
+  return normalised.replace(/\n/g, "<br />\n");
+}
+
 export function fillTemplate(template: string, vars: Record<string, string>) {
   return template.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? "");
 }

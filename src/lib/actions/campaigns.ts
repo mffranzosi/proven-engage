@@ -4,9 +4,9 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/require-user";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { sendGmail, fillTemplate, checkThreadForReply } from "@/lib/gmail";
+import { sendGmail, fillTemplate, bodyToHtml, checkThreadForReply } from "@/lib/gmail";
 import { getContact } from "@/lib/notion";
-import type { SendResult } from "@/lib/send-result";
+import type { SendResult, TestSendResult } from "@/lib/send-result";
 
 export async function createCampaign(formData: FormData) {
   const user = await requireUser();
@@ -154,7 +154,7 @@ export async function sendCampaign(campaignId: string, _prev?: SendResult, _form
     }
 
     const html =
-      fillTemplate(campaign.bodyTemplate, {
+      fillTemplate(bodyToHtml(campaign.bodyTemplate), {
         firstName: contact.name.split(" ")[0] ?? contact.name,
         fullName: contact.name,
       }) +
@@ -204,6 +204,39 @@ export async function sendCampaign(campaignId: string, _prev?: SendResult, _form
 
   revalidatePath(`/campaigns/${campaignId}`);
   return result;
+}
+
+export async function sendTestEmail(
+  campaignId: string,
+  _prev?: TestSendResult,
+  _formData?: FormData,
+): Promise<TestSendResult> {
+  const user = await requireUser();
+
+  const campaign = await prisma.campaign.findUnique({
+    where: { id: campaignId },
+    include: { sendAsAccount: true, attachments: true },
+  });
+  if (!campaign) return { ok: false, message: "Campaign not found." };
+
+  const fullName = user.name || user.email;
+  const html =
+    fillTemplate(bodyToHtml(campaign.bodyTemplate), { firstName: fullName.split(" ")[0] ?? fullName, fullName }) +
+    (campaign.sendAsAccount.signatureHtml ? `<br />${campaign.sendAsAccount.signatureHtml}` : "");
+
+  try {
+    await sendGmail({
+      refreshToken: campaign.sendAsAccount.refreshToken,
+      from: campaign.sendAsAccount.email,
+      to: user.email,
+      subject: `[TEST] ${campaign.subject}`,
+      html,
+      attachments: campaign.attachments.map((a) => ({ filename: a.filename, mimeType: a.mimeType, data: a.data })),
+    });
+    return { ok: true, message: `Test sent to ${user.email}, from ${campaign.sendAsAccount.email}.` };
+  } catch (error) {
+    return { ok: false, message: `Test failed: ${error instanceof Error ? error.message : String(error)}` };
+  }
 }
 
 export async function markContactStatus(campaignContactId: string, status: "REPLIED") {
