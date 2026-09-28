@@ -1,17 +1,27 @@
-import { listContacts } from "@/lib/notion";
+import { listContacts, listCompanies } from "@/lib/notion";
 import { createCampaign } from "@/lib/actions/campaigns";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/require-user";
+import { CampaignContactSelector, type ContactHistoryEntry } from "@/components/campaign-contact-selector";
 
 export const dynamic = "force-dynamic";
 
 export default async function NewCampaignPage() {
   const user = await requireUser();
-  const [contactsRaw, accounts] = await Promise.all([
+  const [contactsRaw, companies, accounts, listRows, pastEntries] = await Promise.all([
     listContacts(),
+    listCompanies(),
     prisma.connectedEmailAccount.findMany({ where: { userId: user.id }, orderBy: { createdAt: "asc" } }),
+    prisma.contactList.findMany({ orderBy: { name: "asc" }, include: { members: true } }),
+    prisma.campaignContact.findMany({ include: { campaign: { select: { name: true } } } }),
   ]);
   const contacts = contactsRaw.sort((a, b) => a.name.localeCompare(b.name));
+  const lists = listRows.map((l) => ({ id: l.id, name: l.name, memberIds: l.members.map((m) => m.notionContactId) }));
+
+  const history: Record<string, ContactHistoryEntry[]> = {};
+  for (const e of pastEntries) {
+    (history[e.notionContactId] ??= []).push({ campaign: e.campaign.name, sent: e.status !== "QUEUED" });
+  }
 
   if (accounts.length === 0) {
     return (
@@ -68,14 +78,8 @@ export default async function NewCampaignPage() {
         </div>
         <div>
           <label className="block text-sm font-medium text-neutral-700">Contacts</label>
-          <div className="mt-1 max-h-64 space-y-1 overflow-y-auto rounded-md border border-neutral-300 p-3">
-            {contacts.map((c) => (
-              <label key={c.id} className="flex items-center gap-2 text-sm">
-                <input type="checkbox" name="contactIds" value={c.id} />
-                {c.name} <span className="text-neutral-400">({c.email ?? "no email"})</span>
-              </label>
-            ))}
-            {contacts.length === 0 ? <p className="text-sm text-neutral-500">No contacts yet.</p> : null}
+          <div className="mt-1">
+            <CampaignContactSelector contacts={contacts} companies={companies} lists={lists} history={history} />
           </div>
         </div>
         <button type="submit" className="rounded-md bg-proven-yellow px-3 py-2 text-sm font-semibold text-proven-black hover:bg-proven-yellow-dark">
