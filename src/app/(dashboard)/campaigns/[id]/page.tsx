@@ -4,7 +4,6 @@ import { prisma } from "@/lib/prisma";
 import { listContacts, listCompanies } from "@/lib/notion";
 import { requireUser } from "@/lib/require-user";
 import {
-  sendCampaign,
   markContactStatus,
   updateCampaign,
   updateCampaignSendAs,
@@ -14,8 +13,11 @@ import {
 } from "@/lib/actions/campaigns";
 import { ContactPicker } from "@/components/contact-picker";
 import { DeleteCampaignButton } from "@/components/delete-campaign-button";
+import { SendCampaignButton } from "@/components/send-campaign-button";
 
 export const dynamic = "force-dynamic";
+// Sending runs inside this page's server action; allow enough time for larger lists.
+export const maxDuration = 300;
 
 const STATUS_LABEL: Record<string, string> = {
   QUEUED: "Queued",
@@ -46,7 +48,6 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
   if (!campaign) notFound();
 
   const contactById = new Map(contacts.map((c) => [c.id, c]));
-  const sendCampaignWithId = sendCampaign.bind(null, campaign.id);
   const updateCampaignWithId = updateCampaign.bind(null, campaign.id);
   const updateSendAsWithId = updateCampaignSendAs.bind(null, campaign.id);
   const deleteCampaignWithId = deleteCampaign.bind(null, campaign.id);
@@ -161,11 +162,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
               </form>
             ) : null}
             {queuedCount > 0 ? (
-              <form action={sendCampaignWithId}>
-                <button type="submit" className="rounded-md bg-proven-yellow px-3 py-2 text-sm font-semibold text-proven-black hover:bg-proven-yellow-dark">
-                  Send to {queuedCount} queued contact{queuedCount === 1 ? "" : "s"}
-                </button>
-              </form>
+              <SendCampaignButton campaignId={campaign.id} queuedCount={queuedCount} />
             ) : queuedCount === 0 && checkableCount === 0 ? (
               <span className="text-sm text-neutral-400">All sent</span>
             ) : null}

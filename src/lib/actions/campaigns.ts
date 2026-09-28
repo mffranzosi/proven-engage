@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { sendGmail, fillTemplate, checkThreadForReply } from "@/lib/gmail";
 import { getContact } from "@/lib/notion";
+import type { SendResult } from "@/lib/send-result";
 
 export async function createCampaign(formData: FormData) {
   const user = await requireUser();
@@ -126,8 +127,10 @@ export async function addContactsToCampaign(campaignId: string, formData: FormDa
   revalidatePath(`/campaigns/${campaignId}`);
 }
 
-export async function sendCampaign(campaignId: string) {
+export async function sendCampaign(campaignId: string, _prev?: SendResult, _formData?: FormData): Promise<SendResult> {
   const user = await requireUser();
+  const result = { sent: 0, noEmail: 0, failed: 0, firstError: null as string | null, stoppedEarly: false };
+  let consecutiveFailures = 0;
 
   const campaign = await prisma.campaign.findUnique({
     where: { id: campaignId },
@@ -139,9 +142,14 @@ export async function sendCampaign(campaignId: string) {
   const attachments = campaign.attachments.map((a) => ({ filename: a.filename, mimeType: a.mimeType, data: a.data }));
 
   for (const cc of campaign.contacts) {
+    if (consecutiveFailures >= 3) {
+      result.stoppedEarly = true;
+      break;
+    }
     const contact = await getContact(cc.notionContactId).catch(() => null);
     if (!contact?.email) {
       await prisma.campaignContact.update({ where: { id: cc.id }, data: { status: "BOUNCED" } });
+      result.noEmail++;
       continue;
     }
 
@@ -182,16 +190,20 @@ export async function sendCampaign(campaignId: string) {
           },
         }),
       ]);
+      result.sent++;
+      consecutiveFailures = 0;
     } catch (error) {
-      await prisma.campaignContact.update({
-        where: { id: cc.id },
-        data: { status: "BOUNCED" },
-      });
+      // Leave the contact QUEUED so the send can be retried once the cause is fixed.
+      result.failed++;
+      consecutiveFailures++;
+      const message = error instanceof Error ? error.message : String(error);
+      result.firstError ??= message;
       console.error(`Failed to send to ${contact.email}`, error);
     }
   }
 
   revalidatePath(`/campaigns/${campaignId}`);
+  return result;
 }
 
 export async function markContactStatus(campaignContactId: string, status: "REPLIED") {
