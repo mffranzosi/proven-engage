@@ -23,6 +23,7 @@ export function ContactPicker({
   const [segment, setSegment] = useState("");
   const [companyFilter, setCompanyFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [emailKnown, setEmailKnown] = useState<"any" | "yes" | "no">("any");
 
   const filtered = useMemo(() => {
     return contacts.filter((c) => {
@@ -30,13 +31,15 @@ export function ContactPicker({
       if (segment && !(company?.segment ?? []).includes(segment)) return false;
       if (companyFilter && !(company?.name ?? "").toLowerCase().includes(companyFilter.toLowerCase())) return false;
       if (statusFilter && !(c.businessStatus ?? "").toLowerCase().includes(statusFilter.toLowerCase())) return false;
+      if (emailKnown === "yes" && !c.email) return false;
+      if (emailKnown === "no" && c.email) return false;
       return true;
     });
-  }, [contacts, companyById, segment, companyFilter, statusFilter]);
+  }, [contacts, companyById, segment, companyFilter, statusFilter, emailKnown]);
 
   return (
     <form action={formAction} className="space-y-3">
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <select value={segment} onChange={(e) => setSegment(e.target.value)} className="rounded-md border border-neutral-300 px-2 py-1.5 text-xs">
           <option value="">All segments</option>
           {segmentOptions.map((s) => (
@@ -57,6 +60,15 @@ export function ContactPicker({
           placeholder="Filter by pipeline status…"
           className="rounded-md border border-neutral-300 px-2 py-1.5 text-xs"
         />
+        <select
+          value={emailKnown}
+          onChange={(e) => setEmailKnown(e.target.value as "any" | "yes" | "no")}
+          className="rounded-md border border-neutral-300 px-2 py-1.5 text-xs"
+        >
+          <option value="any">Email known? Any</option>
+          <option value="yes">Email known? Yes</option>
+          <option value="no">Email known? No</option>
+        </select>
       </div>
       <div className="max-h-64 space-y-1 overflow-y-auto rounded-md border border-neutral-300 p-3">
         {filtered.map((c) => (
