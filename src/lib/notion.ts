@@ -80,6 +80,8 @@ export type NotionContact = {
   businessStatus: string | null;
   companyId: string | null;
   connectedOn: string | null;
+  contactType: string | null;
+  language: string | null;
 };
 
 function mapContact(page: NotionPage): NotionContact {
@@ -94,6 +96,8 @@ function mapContact(page: NotionPage): NotionContact {
     businessStatus: statusValue(p["Business status"]),
     companyId: relationIds(p["Company"])[0] ?? null,
     connectedOn: dateValue(p["Connected on"]),
+    contactType: selectValue(p["Contact Type"]),
+    language: selectValue(p["Language"]),
   };
 }
 

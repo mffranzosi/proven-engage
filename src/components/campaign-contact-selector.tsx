@@ -30,6 +30,7 @@ export function CampaignContactSelector({
   const [search, setSearch] = useState("");
   const [emailKnown, setEmailKnown] = useState<"any" | "yes" | "no">("yes");
   const [contacted, setContacted] = useState<"any" | "yes" | "no">("any");
+  const [contactType, setContactType] = useState<"any" | "Person" | "Office">("any");
 
   const hasBeenSent = (id: string) => (history[id] ?? []).some((h) => h.sent);
 
@@ -42,11 +43,12 @@ export function CampaignContactSelector({
       if (emailKnown === "no" && c.email) return false;
       if (contacted === "yes" && !hasBeenSent(c.id)) return false;
       if (contacted === "no" && hasBeenSent(c.id)) return false;
+      if (contactType !== "any" && c.contactType !== contactType) return false;
       if (q && !`${c.name} ${company?.name ?? ""}`.toLowerCase().includes(q)) return false;
       return true;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contacts, companyById, segment, search, contacted, emailKnown, history]);
+  }, [contacts, companyById, segment, search, contacted, emailKnown, contactType, history]);
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -152,6 +154,18 @@ export function CampaignContactSelector({
             <option value="no">No</option>
           </select>
         </label>
+        <label className="flex items-center gap-1.5">
+          Contact Type
+          <select
+            value={contactType}
+            onChange={(e) => setContactType(e.target.value as "any" | "Person" | "Office")}
+            className="rounded-md border border-neutral-300 px-2 py-1 text-xs"
+          >
+            <option value="any">Any</option>
+            <option value="Person">Person</option>
+            <option value="Office">Office</option>
+          </select>
+        </label>
         <button type="button" onClick={selectAllShown} className="font-medium text-neutral-900 hover:underline">
           Select all {shown.length} shown
         </button>
@@ -164,6 +178,9 @@ export function CampaignContactSelector({
             <label key={c.id} className="flex flex-wrap items-center gap-2 text-sm">
               <input type="checkbox" checked={selected.has(c.id)} onChange={() => toggle(c.id)} />
               {c.name}
+              {c.contactType ? (
+                <span className="rounded bg-neutral-100 px-1.5 py-0.5 text-[11px] text-neutral-500">{c.contactType}</span>
+              ) : null}
               <span className="text-neutral-400">
                 ({company?.name ?? "no company"}
                 {company?.segment.length ? ` · ${company.segment.join(", ")}` : ""})
