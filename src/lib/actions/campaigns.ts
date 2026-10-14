@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { sendGmail, fillTemplate, bodyToHtml, checkThreadForReply } from "@/lib/gmail";
 import { getContact } from "@/lib/notion";
 import type { SendResult, TestSendResult } from "@/lib/send-result";
+import { remainingSendQuota } from "@/lib/send-quota";
 
 export async function createCampaign(formData: FormData) {
   const user = await requireUser();
@@ -129,7 +130,14 @@ export async function addContactsToCampaign(campaignId: string, formData: FormDa
 
 export async function sendCampaign(campaignId: string, _prev?: SendResult, _formData?: FormData): Promise<SendResult> {
   const user = await requireUser();
-  const result = { sent: 0, noEmail: 0, failed: 0, firstError: null as string | null, stoppedEarly: false };
+  const result = {
+    sent: 0,
+    noEmail: 0,
+    failed: 0,
+    firstError: null as string | null,
+    stoppedEarly: false,
+    heldByDailyLimit: 0,
+  };
   let consecutiveFailures = 0;
 
   const campaign = await prisma.campaign.findUnique({
@@ -141,9 +149,15 @@ export async function sendCampaign(campaignId: string, _prev?: SendResult, _form
   const appUrl = process.env.APP_URL ?? "";
   const attachments = campaign.attachments.map((a) => ({ filename: a.filename, mimeType: a.mimeType, data: a.data }));
 
+  let remainingQuota = await remainingSendQuota(campaign.sendAsAccountId, campaign.sendAsAccount.dailySendLimit);
+
   for (const cc of campaign.contacts) {
     if (consecutiveFailures >= 3) {
       result.stoppedEarly = true;
+      break;
+    }
+    if (remainingQuota <= 0) {
+      result.heldByDailyLimit = campaign.contacts.length - campaign.contacts.indexOf(cc);
       break;
     }
     const contact = await getContact(cc.notionContactId).catch(() => null);
@@ -191,6 +205,7 @@ export async function sendCampaign(campaignId: string, _prev?: SendResult, _form
         }),
       ]);
       result.sent++;
+      remainingQuota--;
       consecutiveFailures = 0;
     } catch (error) {
       // Leave the contact QUEUED so the send can be retried once the cause is fixed.

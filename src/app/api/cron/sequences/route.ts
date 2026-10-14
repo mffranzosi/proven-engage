@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getContact } from "@/lib/notion";
 import { sendGmail, fillTemplate, bodyToHtml } from "@/lib/gmail";
+import { remainingSendQuota } from "@/lib/send-quota";
 
 function isAuthorized(req: NextRequest): boolean {
   const secret = process.env.CRON_SECRET;
@@ -27,10 +28,19 @@ export async function GET(req: NextRequest) {
   });
 
   const results: { enrollmentId: string; outcome: string }[] = [];
+  const remainingQuotaByAccount = new Map<string, number>();
 
   for (const enrollment of due) {
     const step = enrollment.currentStep;
     const sender = step.sequence.sendAsAccount;
+
+    if (!remainingQuotaByAccount.has(sender.id)) {
+      remainingQuotaByAccount.set(sender.id, await remainingSendQuota(sender.id, sender.dailySendLimit));
+    }
+    if ((remainingQuotaByAccount.get(sender.id) ?? 0) <= 0) {
+      results.push({ enrollmentId: enrollment.id, outcome: "skipped: daily send limit reached, will retry next run" });
+      continue;
+    }
 
     const contact = await getContact(enrollment.notionContactId).catch(() => null);
     if (!contact?.email) {
@@ -79,6 +89,7 @@ export async function GET(req: NextRequest) {
         }),
       ]);
 
+      remainingQuotaByAccount.set(sender.id, (remainingQuotaByAccount.get(sender.id) ?? 1) - 1);
       results.push({ enrollmentId: enrollment.id, outcome: "sent" });
     } catch (error) {
       console.error(`Sequence send failed for enrollment ${enrollment.id}`, error);

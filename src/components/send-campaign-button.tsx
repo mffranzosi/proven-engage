@@ -44,6 +44,12 @@ export function SendCampaignButton({ campaignId, queuedCount }: { campaignId: st
               {result.firstError ? `: ${result.firstError}` : ""}. Fix the cause, then send again.
             </p>
           ) : null}
+          {result.heldByDailyLimit > 0 ? (
+            <p className="text-neutral-500">
+              {result.heldByDailyLimit} held back: today&apos;s daily send limit was reached. They remain queued —
+              send again tomorrow, or raise the limit in Connected accounts.
+            </p>
+          ) : null}
         </div>
       ) : null}
     </div>

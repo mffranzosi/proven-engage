@@ -122,6 +122,7 @@ model ConnectedEmailAccount {
   email         String
   refreshToken  String
   signatureHtml String?
+  dailySendLimit Int?
   createdAt     DateTime @default(now())
 
   user      User       @relation("ConnectedEmailAccountOwner", fields: [userId], references: [id], onDelete: Cascade)

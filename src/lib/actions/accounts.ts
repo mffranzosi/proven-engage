@@ -42,3 +42,23 @@ export async function updateAccountSignature(accountId: string, formData: FormDa
 
   revalidatePath("/settings/accounts");
 }
+
+export async function updateDailySendLimit(accountId: string, formData: FormData) {
+  const user = await requireUser();
+
+  const account = await prisma.connectedEmailAccount.findFirst({
+    where: { id: accountId, userId: user.id },
+  });
+  if (!account) throw new Error("Account not found.");
+
+  const raw = String(formData.get("dailySendLimit") || "").trim();
+  const dailySendLimit = raw ? Math.max(1, Math.round(Number(raw))) : null;
+  if (raw && !Number.isFinite(dailySendLimit)) throw new Error("Daily send limit must be a number.");
+
+  await prisma.connectedEmailAccount.update({
+    where: { id: accountId },
+    data: { dailySendLimit },
+  });
+
+  revalidatePath("/settings/accounts");
+}

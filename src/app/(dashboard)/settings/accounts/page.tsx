@@ -3,6 +3,8 @@ import { requireUser } from "@/lib/require-user";
 import { DisconnectAccountButton } from "@/components/disconnect-account-button";
 import { SignatureEditor } from "@/components/signature-editor";
 import { checkAccountHealth } from "@/lib/gmail";
+import { remainingSendQuota, DEFAULT_DAILY_SEND_LIMIT } from "@/lib/send-quota";
+import { updateDailySendLimit } from "@/lib/actions/accounts";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +22,8 @@ export default async function ConnectedAccountsPage({
   });
   const healthList = await Promise.all(accounts.map((a) => checkAccountHealth(a.refreshToken)));
   const healthById = new Map(accounts.map((a, i) => [a.id, healthList[i]]));
+  const remainingList = await Promise.all(accounts.map((a) => remainingSendQuota(a.id, a.dailySendLimit)));
+  const remainingById = new Map(accounts.map((a, i) => [a.id, remainingList[i]]));
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -69,6 +73,27 @@ export default async function ConnectedAccountsPage({
                 <div>
                   <p className="mb-1 text-xs font-medium text-neutral-500">Signature</p>
                   <SignatureEditor accountId={a.id} initialHtml={a.signatureHtml} />
+                </div>
+                <div>
+                  <p className="mb-1 text-xs font-medium text-neutral-500">Daily send limit</p>
+                  <form action={updateDailySendLimit.bind(null, a.id)} className="flex flex-wrap items-center gap-2">
+                    <input
+                      type="number"
+                      name="dailySendLimit"
+                      min={1}
+                      defaultValue={a.dailySendLimit ?? ""}
+                      placeholder={String(DEFAULT_DAILY_SEND_LIMIT)}
+                      className="w-24 rounded-md border border-neutral-300 px-2 py-1 text-sm"
+                    />
+                    <button type="submit" className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50">
+                      Save
+                    </button>
+                    <span className="text-xs text-neutral-400">
+                      Avoids spam filters from sending too many emails in one day. Blank = default of{" "}
+                      {DEFAULT_DAILY_SEND_LIMIT}. Used today:{" "}
+                      {(a.dailySendLimit ?? DEFAULT_DAILY_SEND_LIMIT) - (remainingById.get(a.id) ?? 0)} / {a.dailySendLimit ?? DEFAULT_DAILY_SEND_LIMIT}
+                    </span>
+                  </form>
                 </div>
               </li>
             ))}

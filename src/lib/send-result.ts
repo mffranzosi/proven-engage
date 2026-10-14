@@ -6,4 +6,5 @@ export type SendResult = {
   failed: number;
   firstError: string | null;
   stoppedEarly: boolean;
+  heldByDailyLimit: number;
 } | null;
