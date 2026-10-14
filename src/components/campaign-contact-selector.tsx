@@ -31,6 +31,12 @@ export function CampaignContactSelector({
   const [emailKnown, setEmailKnown] = useState<"any" | "yes" | "no">("yes");
   const [contacted, setContacted] = useState<"any" | "yes" | "no">("any");
   const [contactType, setContactType] = useState<"any" | "Person" | "Office">("any");
+  const [language, setLanguage] = useState("");
+
+  const languageOptions = useMemo(
+    () => [...new Set(contacts.map((c) => c.language).filter((l): l is string => Boolean(l)))].sort(),
+    [contacts],
+  );
 
   const hasBeenSent = (id: string) => (history[id] ?? []).some((h) => h.sent);
 
@@ -44,11 +50,12 @@ export function CampaignContactSelector({
       if (contacted === "yes" && !hasBeenSent(c.id)) return false;
       if (contacted === "no" && hasBeenSent(c.id)) return false;
       if (contactType !== "any" && c.contactType !== contactType) return false;
+      if (language && c.language !== language) return false;
       if (q && !`${c.name} ${company?.name ?? ""}`.toLowerCase().includes(q)) return false;
       return true;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contacts, companyById, segment, search, contacted, emailKnown, contactType, history]);
+  }, [contacts, companyById, segment, search, contacted, emailKnown, contactType, language, history]);
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -166,6 +173,21 @@ export function CampaignContactSelector({
             <option value="Office">Office</option>
           </select>
         </label>
+        <label className="flex items-center gap-1.5">
+          Language
+          <select
+            value={language}
+            onChange={(e) => setLanguage(e.target.value)}
+            className="rounded-md border border-neutral-300 px-2 py-1 text-xs"
+          >
+            <option value="">Any</option>
+            {languageOptions.map((l) => (
+              <option key={l} value={l}>
+                {l}
+              </option>
+            ))}
+          </select>
+        </label>
         <button type="button" onClick={selectAllShown} className="font-medium text-neutral-900 hover:underline">
           Select all {shown.length} shown
         </button>
@@ -180,6 +202,9 @@ export function CampaignContactSelector({
               {c.name}
               {c.contactType ? (
                 <span className="rounded bg-neutral-100 px-1.5 py-0.5 text-[11px] text-neutral-500">{c.contactType}</span>
+              ) : null}
+              {c.language ? (
+                <span className="rounded bg-neutral-100 px-1.5 py-0.5 text-[11px] text-neutral-500">{c.language}</span>
               ) : null}
               <span className="text-neutral-400">
                 ({company?.name ?? "no company"}
