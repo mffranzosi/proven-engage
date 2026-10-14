@@ -24,6 +24,7 @@ export function ContactPicker({
   const [companyFilter, setCompanyFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [emailKnown, setEmailKnown] = useState<"any" | "yes" | "no">("any");
+  const [contactType, setContactType] = useState<"any" | "Person" | "Office">("any");
 
   const filtered = useMemo(() => {
     return contacts.filter((c) => {
@@ -33,13 +34,14 @@ export function ContactPicker({
       if (statusFilter && !(c.businessStatus ?? "").toLowerCase().includes(statusFilter.toLowerCase())) return false;
       if (emailKnown === "yes" && !c.email) return false;
       if (emailKnown === "no" && c.email) return false;
+      if (contactType !== "any" && c.contactType !== contactType) return false;
       return true;
     });
-  }, [contacts, companyById, segment, companyFilter, statusFilter, emailKnown]);
+  }, [contacts, companyById, segment, companyFilter, statusFilter, emailKnown, contactType]);
 
   return (
     <form action={formAction} className="space-y-3">
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
         <select value={segment} onChange={(e) => setSegment(e.target.value)} className="rounded-md border border-neutral-300 px-2 py-1.5 text-xs">
           <option value="">All segments</option>
           {segmentOptions.map((s) => (
@@ -69,6 +71,15 @@ export function ContactPicker({
           <option value="yes">Email known? Yes</option>
           <option value="no">Email known? No</option>
         </select>
+        <select
+          value={contactType}
+          onChange={(e) => setContactType(e.target.value as "any" | "Person" | "Office")}
+          className="rounded-md border border-neutral-300 px-2 py-1.5 text-xs"
+        >
+          <option value="any">Contact Type: Any</option>
+          <option value="Person">Contact Type: Person</option>
+          <option value="Office">Contact Type: Office</option>
+        </select>
       </div>
       <div className="max-h-64 space-y-1 overflow-y-auto rounded-md border border-neutral-300 p-3">
         {filtered.map((c) => (
@@ -81,6 +92,9 @@ export function ContactPicker({
               {c.email ? "✓" : "✗"}
             </span>
             {c.name}{" "}
+            {c.contactType ? (
+              <span className="rounded bg-neutral-100 px-1.5 py-0.5 text-[11px] text-neutral-500">{c.contactType}</span>
+            ) : null}
             <span className="text-neutral-400">
               ({c.companyId ? companyById.get(c.companyId)?.name ?? "" : "no company"})
             </span>
