@@ -112,7 +112,11 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
       </div>
 
       {isDraft ? (
-        <form action={updateCampaignWithId} className="space-y-4 rounded-lg border border-neutral-200 bg-white p-6">
+        <form
+          action={updateCampaignWithId}
+          encType="multipart/form-data"
+          className="space-y-4 rounded-lg border border-neutral-200 bg-white p-6"
+        >
           <h2 className="text-sm font-semibold text-neutral-900">Edit campaign</h2>
           <div>
             <label className="block text-sm font-medium text-neutral-700">Campaign name</label>
@@ -134,6 +138,26 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
               defaultValue={campaign.bodyTemplate}
               className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm font-mono"
             />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-neutral-700">Attachments</label>
+            {campaign.attachments.length > 0 ? (
+              <div className="mt-1 space-y-1">
+                {campaign.attachments.map((a) => (
+                  <label key={a.id} className="flex items-center gap-2 text-sm text-neutral-600">
+                    <input type="checkbox" name="removeAttachmentIds" value={a.id} />
+                    Remove {a.filename}
+                  </label>
+                ))}
+              </div>
+            ) : null}
+            <input
+              type="file"
+              name="attachments"
+              multiple
+              className="mt-2 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-neutral-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-neutral-700 hover:file:bg-neutral-200"
+            />
+            <p className="mt-1 text-xs text-neutral-400">Up to 3.5MB in total, across kept and new files.</p>
           </div>
           <button type="submit" className="rounded-md bg-proven-yellow px-3 py-2 text-sm font-semibold text-proven-black hover:bg-proven-yellow-dark">
             Save draft

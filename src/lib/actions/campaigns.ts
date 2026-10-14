@@ -9,6 +9,23 @@ import { getContact } from "@/lib/notion";
 import type { SendResult, TestSendResult } from "@/lib/send-result";
 import { remainingSendQuota } from "@/lib/send-quota";
 
+const MAX_ATTACHMENT_BYTES = 3.5 * 1024 * 1024;
+
+async function readAttachmentsFromForm(formData: FormData, alreadyUsedBytes = 0) {
+  const attachmentFiles = formData.getAll("attachments").filter((f): f is File => f instanceof File && f.size > 0);
+  const totalBytes = alreadyUsedBytes + attachmentFiles.reduce((sum, f) => sum + f.size, 0);
+  if (totalBytes > MAX_ATTACHMENT_BYTES) {
+    throw new Error("Attachments are too large: keep the total under 3.5MB.");
+  }
+  return Promise.all(
+    attachmentFiles.map(async (file) => ({
+      filename: file.name,
+      mimeType: file.type || "application/octet-stream",
+      data: Buffer.from(await file.arrayBuffer()).toString("base64"),
+    })),
+  );
+}
+
 export async function createCampaign(formData: FormData) {
   const user = await requireUser();
 
@@ -30,18 +47,7 @@ export async function createCampaign(formData: FormData) {
   });
   if (!account) throw new Error("That connected account was not found.");
 
-  const attachmentFiles = formData.getAll("attachments").filter((f): f is File => f instanceof File && f.size > 0);
-  const MAX_ATTACHMENT_BYTES = 3.5 * 1024 * 1024;
-  if (attachmentFiles.reduce((sum, f) => sum + f.size, 0) > MAX_ATTACHMENT_BYTES) {
-    throw new Error("Attachments are too large: keep the total under 3.5MB.");
-  }
-  const attachments = await Promise.all(
-    attachmentFiles.map(async (file) => ({
-      filename: file.name,
-      mimeType: file.type || "application/octet-stream",
-      data: Buffer.from(await file.arrayBuffer()).toString("base64"),
-    })),
-  );
+  const attachments = await readAttachmentsFromForm(formData);
 
   const campaign = await prisma.campaign.create({
     data: {
@@ -67,7 +73,7 @@ export async function updateCampaign(campaignId: string, formData: FormData) {
 
   const existing = await prisma.campaign.findUnique({
     where: { id: campaignId },
-    include: { contacts: true },
+    include: { contacts: true, attachments: true },
   });
   if (!existing) throw new Error("Campaign not found.");
   if (existing.contacts.some((c) => c.status !== "QUEUED")) {
@@ -82,10 +88,24 @@ export async function updateCampaign(campaignId: string, formData: FormData) {
     throw new Error("Name, subject, and body are required.");
   }
 
-  await prisma.campaign.update({
-    where: { id: campaignId },
-    data: { name, subject, bodyTemplate },
-  });
+  const removeAttachmentIds = new Set(formData.getAll("removeAttachmentIds").map(String));
+  const keptBytes = existing.attachments
+    .filter((a) => !removeAttachmentIds.has(a.id))
+    .reduce((sum, a) => sum + Buffer.byteLength(a.data, "base64"), 0);
+  const newAttachments = await readAttachmentsFromForm(formData, keptBytes);
+
+  await prisma.$transaction([
+    prisma.campaign.update({
+      where: { id: campaignId },
+      data: { name, subject, bodyTemplate },
+    }),
+    ...(removeAttachmentIds.size > 0
+      ? [prisma.campaignAttachment.deleteMany({ where: { id: { in: [...removeAttachmentIds] }, campaignId } })]
+      : []),
+    ...(newAttachments.length > 0
+      ? [prisma.campaignAttachment.createMany({ data: newAttachments.map((a) => ({ ...a, campaignId })) })]
+      : []),
+  ]);
 
   redirect(`/campaigns/${campaignId}`);
 }
