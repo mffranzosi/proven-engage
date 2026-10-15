@@ -23,7 +23,7 @@ export const maxDuration = 300;
 
 const STATUS_LABEL: Record<string, string> = {
   QUEUED: "Queued",
-  SENT: "Sent",
+  SENT: "Sent, unopened",
   OPENED: "Opened",
   REPLIED: "Replied",
   BOUNCED: "Bounced",

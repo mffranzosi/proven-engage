@@ -76,7 +76,8 @@ export default async function CampaignsPage({
               <th className="px-4 py-2 font-medium">Name</th>
               <th className="px-4 py-2 font-medium">Subject</th>
               <th className="px-4 py-2 font-medium">Sending from</th>
-              <th className="px-4 py-2 font-medium">Sent</th>
+              <th className="px-4 py-2 font-medium">Total sent</th>
+              <th className="px-4 py-2 font-medium">Unopened</th>
               <th className="px-4 py-2 font-medium">Opened</th>
               <th className="px-4 py-2 font-medium">Replied</th>
               <th className="px-4 py-2 font-medium">Bounced</th>
@@ -88,6 +89,7 @@ export default async function CampaignsPage({
             {campaigns.map((c) => {
               const isDraft = c.contacts.every((cc) => cc.status === "QUEUED");
               const countOf = (status: string) => c.contacts.filter((cc) => cc.status === status).length;
+              const totalSent = countOf("SENT") + countOf("OPENED") + countOf("REPLIED");
               const deleteCampaignWithId = deleteCampaign.bind(null, c.id);
               return (
                 <tr key={c.id} className="border-b border-neutral-100 last:border-0 hover:bg-neutral-50">
@@ -98,6 +100,7 @@ export default async function CampaignsPage({
                   </td>
                   <td className="px-4 py-2 text-neutral-600">{c.subject}</td>
                   <td className="px-4 py-2 text-neutral-600">{c.sendAsAccount.email}</td>
+                  <td className="px-4 py-2 text-neutral-600">{totalSent}</td>
                   <td className="px-4 py-2 text-neutral-600">{countOf("SENT")}</td>
                   <td className="px-4 py-2 text-neutral-600">{countOf("OPENED")}</td>
                   <td className="px-4 py-2 text-neutral-600">{countOf("REPLIED")}</td>
@@ -123,7 +126,7 @@ export default async function CampaignsPage({
             })}
             {campaigns.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-4 py-6 text-center text-neutral-500">
+                <td colSpan={10} className="px-4 py-6 text-center text-neutral-500">
                   No campaigns yet.
                 </td>
               </tr>
